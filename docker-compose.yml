@@ -1,0 +1,76 @@
+services:
+  # PostgreSQL with PostGIS for spatial data
+  database:
+    image: postgis/postgis:15-3.3
+    container_name: urban-studio-db
+    environment:
+      POSTGRES_DB: urban_studio
+      POSTGRES_USER: urban_dev
+      POSTGRES_PASSWORD: dev_password_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - urban-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: urban-studio-backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./data:/app/uploads
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - database
+    networks:
+      - urban-network
+
+  # QGIS Processing Server
+  qgis-server:
+    build:
+      context: ./qgis-processing
+      dockerfile: Dockerfile
+    container_name: urban-studio-qgis
+    environment:
+      - QGIS_SERVER_LOG_LEVEL=2
+    ports:
+      - "8081:5000"
+    volumes:
+      - ./data:/data
+      - ./qgis-processing:/app
+    depends_on:
+      - database
+    networks:
+      - urban-network
+
+  # React development server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: urban-studio-frontend
+    ports:
+      - "8080:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_QGIS_SERVER_URL=http://localhost:8081
+    networks:
+      - urban-network
+
+volumes:
+  postgres_data:
+
+networks:
+  urban-network:
+    driver: bridge
