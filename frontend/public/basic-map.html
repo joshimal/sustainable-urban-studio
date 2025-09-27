@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Basic Map Test</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            width: 100vw;
+            height: 100vh;
+        }
+        .map-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="map-info">
+        <h3>Map Test</h3>
+        <p>Status: <span id="status">Loading...</span></p>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        console.log('🗺️ Starting basic map test...');
+        
+        // Set Mapbox access token
+        mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+        
+        console.log('✅ Access token set');
+        
+        // Create map
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [-73.5143, 40.7259], // Nassau County, NY
+            zoom: 10
+        });
+        
+        console.log('✅ Map instance created');
+        
+        // Add event listeners
+        map.on('load', function() {
+            console.log('✅ Map loaded successfully');
+            document.getElementById('status').textContent = 'Map loaded!';
+            
+            // Add a marker
+            new mapboxgl.Marker()
+                .setLngLat([-73.5143, 40.7259])
+                .addTo(map);
+            
+            console.log('✅ Marker added');
+        });
+        
+        map.on('error', function(e) {
+            console.error('❌ Map error:', e);
+            document.getElementById('status').textContent = 'Error: ' + e.error.message;
+        });
+        
+        // Test GIS data loading
+        async function loadGISData() {
+            try {
+                console.log('🔄 Loading GIS data...');
+                const response = await fetch('http://localhost:3001/api/qgis/nassau/get-data?type=parcels');
+                const data = await response.json();
+                console.log('✅ GIS data loaded:', data);
+                
+                if (data.data && data.data.features) {
+                    // Add parcels as a source
+                    map.addSource('parcels', {
+                        type: 'geojson',
+                        data: data.data
+                    });
+                    
+                    // Add parcels layer
+                    map.addLayer({
+                        id: 'parcels-fill',
+                        type: 'fill',
+                        source: 'parcels',
+                        paint: {
+                            'fill-color': '#22c55e',
+                            'fill-opacity': 0.6
+                        }
+                    });
+                    
+                    console.log('✅ Parcels layer added');
+                }
+            } catch (error) {
+                console.error('❌ Error loading GIS data:', error);
+            }
+        }
+        
+        // Load GIS data after map loads
+        map.on('load', loadGISData);
+    </script>
+</body>
+</html>
+
+

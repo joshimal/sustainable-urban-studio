@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UrbanSync - Professional GIS Interface</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* Left Panel - Layer Management */
+        .left-panel {
+            width: 380px;
+            background: #2d2d2d;
+            border-right: 1px solid #404040;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        
+        .panel-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #404040;
+            background: #1f1f1f;
+        }
+        
+        .panel-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+        }
+        
+        .panel-subtitle {
+            font-size: 0.875rem;
+            color: #a0a0a0;
+        }
+        
+        .panel-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        
+        .section {
+            margin-bottom: 2rem;
+        }
+        
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-icon {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+        
+        /* Layer List */
+        .layer-list {
+            background: #1f1f1f;
+            border-radius: 8px;
+            border: 1px solid #404040;
+            overflow: hidden;
+        }
+        
+        .layer-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #404040;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .layer-item:last-child {
+            border-bottom: none;
+        }
+        
+        .layer-item:hover {
+            background: #2a2a2a;
+        }
+        
+        .layer-item.active {
+            background: #1e40af;
+        }
+        
+        .layer-thumbnail {
+            width: 40px;
+            height: 40px;
+            background: #404040;
+            border-radius: 6px;
+            margin-right: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: #a0a0a0;
+        }
+        
+        .layer-info {
+            flex: 1;
+        }
+        
+        .layer-name {
+            font-weight: 500;
+            color: #ffffff;
+            margin-bottom: 0.25rem;
+        }
+        
+        .layer-meta {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+        }
+        
+        .layer-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .layer-toggle {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid #404040;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .layer-toggle.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        
+        .layer-menu {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid #404040;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0a0a0;
+        }
+        
+        /* Style Controls */
+        .style-controls {
+            background: #1f1f1f;
+            border-radius: 8px;
+            border: 1px solid #404040;
+            padding: 1rem;
+        }
+        
+        .control-group {
+            margin-bottom: 1rem;
+        }
+        
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .control-label {
+            font-size: 0.875rem;
+            color: #a0a0a0;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        
+        .control-input {
+            width: 100%;
+            background: #2d2d2d;
+            border: 1px solid #404040;
+            border-radius: 6px;
+            padding: 0.5rem;
+            color: #ffffff;
+            font-size: 0.875rem;
+        }
+        
+        .control-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .color-picker {
+            width: 100%;
+            height: 40px;
+            border: 1px solid #404040;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .slider-container {
+            position: relative;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #404040;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .slider-value {
+            position: absolute;
+            top: -25px;
+            right: 0;
+            font-size: 0.75rem;
+            color: #a0a0a0;
+        }
+        
+        /* Map Container */
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: #1a1a1a;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Map Controls */
+        .map-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(45, 45, 45, 0.9);
+            border: 1px solid #404040;
+            border-radius: 8px;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-btn:hover {
+            background: rgba(59, 130, 246, 0.9);
+            border-color: #3b82f6;
+        }
+        
+        /* Bottom Info Panel */
+        .info-panel {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            right: 1rem;
+            background: rgba(45, 45, 45, 0.95);
+            border: 1px solid #404040;
+            border-radius: 12px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        .info-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .info-thumbnail {
+            width: 60px;
+            height: 60px;
+            background: #404040;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0a0a0;
+            font-size: 0.75rem;
+        }
+        
+        .info-details h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 0.25rem;
+        }
+        
+        .info-details p {
+            font-size: 0.875rem;
+            color: #a0a0a0;
+            margin-bottom: 0.25rem;
+        }
+        
+        .info-rating {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .star {
+            color: #fbbf24;
+            font-size: 0.875rem;
+        }
+        
+        /* Add Layer Button */
+        .add-layer-btn {
+            width: 100%;
+            background: #3b82f6;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: #ffffff;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-bottom: 1rem;
+        }
+        
+        .add-layer-btn:hover {
+            background: #2563eb;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #1f1f1f;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 0.75rem;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 0.875rem;
+            color: #a0a0a0;
+        }
+        
+        .tab.active {
+            background: #3b82f6;
+            color: #ffffff;
+        }
+        
+        .tab:hover:not(.active) {
+            background: #2a2a2a;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .left-panel {
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: -100%;
+                transition: left 0.3s;
+                z-index: 2000;
+            }
+            
+            .left-panel.open {
+                left: 0;
+            }
+            
+            .map-container {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Panel - Layer Management -->
+        <div class="left-panel">
+            <div class="panel-header">
+                <div class="panel-title">UrbanSync GIS</div>
+                <div class="panel-subtitle">Layer Management & Styling</div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('layers')">Layers</div>
+                    <div class="tab" onclick="switchTab('style')">Style</div>
+                    <div class="tab" onclick="switchTab('data')">Data</div>
+                </div>
+                
+                <!-- Layers Tab -->
+                <div id="layers-tab" class="tab-content">
+                    <div class="section">
+                        <div class="section-title">
+                            <div class="section-icon">📁</div>
+                            Data Layers
+                        </div>
+                        <button class="add-layer-btn" onclick="addNewLayer()">+ Add New Layer</button>
+                        
+                        <div class="layer-list">
+                            <div class="layer-item active" onclick="selectLayer('parcels')">
+                                <div class="layer-thumbnail">🏠</div>
+                                <div class="layer-info">
+                                    <div class="layer-name">Property Parcels</div>
+                                    <div class="layer-meta">2w ago • 1,247 features</div>
+                                </div>
+                                <div class="layer-controls">
+                                    <div class="layer-toggle active" onclick="toggleLayer('parcels', event)">✓</div>
+                                    <div class="layer-menu" onclick="showLayerMenu('parcels', event)">⋮</div>
+                                </div>
+                            </div>
+                            
+                            <div class="layer-item" onclick="selectLayer('stations')">
+                                <div class="layer-thumbnail">🚉</div>
+                                <div class="layer-info">
+                                    <div class="layer-name">LIRR Stations</div>
+                                    <div class="layer-meta">1w ago • 23 features</div>
+                                </div>
+                                <div class="layer-controls">
+                                    <div class="layer-toggle active" onclick="toggleLayer('stations', event)">✓</div>
+                                    <div class="layer-menu" onclick="showLayerMenu('stations', event)">⋮</div>
+                                </div>
+                            </div>
+                            
+                            <div class="layer-item" onclick="selectLayer('flood')">
+                                <div class="layer-thumbnail">🌊</div>
+                                <div class="layer-info">
+                                    <div class="layer-name">Flood Zones</div>
+                                    <div class="layer-meta">3d ago • 156 features</div>
+                                </div>
+                                <div class="layer-controls">
+                                    <div class="layer-toggle active" onclick="toggleLayer('flood', event)">✓</div>
+                                    <div class="layer-menu" onclick="showLayerMenu('flood', event)">⋮</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Style Tab -->
+                <div id="style-tab" class="tab-content" style="display: none;">
+                    <div class="section">
+                        <div class="section-title">
+                            <div class="section-icon">🎨</div>
+                            Style Settings
+                        </div>
+                        
+                        <div class="style-controls">
+                            <div class="control-group">
+                                <label class="control-label">Display Style</label>
+                                <select class="control-input">
+                                    <option>Polygon Fill</option>
+                                    <option>Heatmap</option>
+                                    <option>Clusters</option>
+                                    <option>Points</option>
+                                </select>
+                            </div>
+                            
+                            <div class="control-group">
+                                <label class="control-label">Color Scale</label>
+                                <input type="color" class="color-picker" value="#3b82f6">
+                            </div>
+                            
+                            <div class="control-group">
+                                <label class="control-label">Opacity</label>
+                                <div class="slider-container">
+                                    <input type="range" class="slider" min="0" max="100" value="75">
+                                    <div class="slider-value">75%</div>
+                                </div>
+                            </div>
+                            
+                            <div class="control-group">
+                                <label class="control-label">Size</label>
+                                <input type="number" class="control-input" value="8" placeholder="8 px">
+                            </div>
+                            
+                            <div class="control-group">
+                                <label class="control-label">Border</label>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                    <input type="color" class="color-picker" value="#ffffff">
+                                    <input type="number" class="control-input" value="1" placeholder="1px">
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="add-layer-btn" style="flex: 1; margin: 0;">+ Label</button>
+                                <button class="add-layer-btn" style="flex: 1; margin: 0;">+ Badge</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Data Tab -->
+                <div id="data-tab" class="tab-content" style="display: none;">
+                    <div class="section">
+                        <div class="section-title">
+                            <div class="section-icon">📊</div>
+                            Data Analysis
+                        </div>
+                        
+                        <div class="style-controls">
+                            <div class="control-group">
+                                <label class="control-label">Statistics</label>
+                                <div style="background: #2d2d2d; padding: 1rem; border-radius: 6px; font-size: 0.875rem;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                        <span>Total Features:</span>
+                                        <span>1,426</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                        <span>Area Coverage:</span>
+                                        <span>287.3 sq mi</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span>Last Updated:</span>
+                                        <span>2 days ago</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <div class="control-btn" onclick="togglePanel()" title="Toggle Panel">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+                    </svg>
+                </div>
+                <div class="control-btn" onclick="resetView()" title="Reset View">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                </div>
+                <div class="control-btn" onclick="exportMap()" title="Export">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Info Panel -->
+            <div class="info-panel" id="info-panel" style="display: none;">
+                <div class="info-content">
+                    <div class="info-thumbnail">🏠</div>
+                    <div class="info-details">
+                        <h3 id="info-title">Property Parcel</h3>
+                        <p id="info-description">123 Main Street, Hempstead, NY</p>
+                        <p id="info-details">Zoning: R-1 • Area: 5,000 sq ft</p>
+                        <div class="info-rating">
+                            <span class="star">★</span>
+                            <span class="star">★</span>
+                            <span class="star">★</span>
+                            <span class="star">★</span>
+                            <span class="star">☆</span>
+                            <span style="margin-left: 0.5rem; font-size: 0.75rem; color: #a0a0a0;">4.0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🗺️ Starting Professional GIS Interface...');
+        
+        let map;
+        let gisData = {
+            parcels: null,
+            stations: null,
+            flood: null
+        };
+        let layers = {
+            parcels: null,
+            stations: null,
+            flood: null
+        };
+        let layerVisibility = {
+            parcels: true,
+            stations: true,
+            flood: true
+        };
+        let selectedLayer = 'parcels';
+
+        // Initialize map with gray tone
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([40.7259, -73.5143], 10);
+            
+            // Add gray-toned base layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                className: 'gray-tone'
+            }).addTo(map);
+            
+            // Add custom CSS for gray tone
+            const style = document.createElement('style');
+            style.textContent = `
+                .gray-tone {
+                    filter: grayscale(100%) contrast(0.8) brightness(0.9);
+                }
+            `;
+            document.head.appendChild(style);
+            
+            console.log('✅ Map initialized with gray tone');
+        }
+
+        // Load GIS data
+        async function loadGISData() {
+            try {
+                console.log('🔄 Loading GIS data...');
+                
+                const [parcelsRes, stationsRes, floodRes] = await Promise.all([
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=parcels'),
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=stations'),
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=flood_zones')
+                ]);
+                
+                const parcels = await parcelsRes.json();
+                const stations = await stationsRes.json();
+                const flood = await floodRes.json();
+                
+                gisData.parcels = parcels.data;
+                gisData.stations = stations.data;
+                gisData.flood = flood.data;
+                
+                console.log('✅ GIS data loaded');
+                addLayersToMap();
+                
+            } catch (error) {
+                console.error('❌ Error loading GIS data:', error);
+            }
+        }
+
+        // Add layers to map
+        function addLayersToMap() {
+            // Add parcels layer
+            if (gisData.parcels) {
+                layers.parcels = L.geoJSON(gisData.parcels, {
+                    style: function(feature) {
+                        const zoning = feature.properties.zoning;
+                        let color = '#6b7280';
+                        
+                        if (zoning === 'R-1') color = '#22c55e';
+                        else if (zoning === 'R-2') color = '#fbbf24';
+                        else if (zoning === 'C-1') color = '#ef4444';
+                        
+                        return {
+                            color: color,
+                            weight: 1,
+                            opacity: 0.8,
+                            fillOpacity: 0.6
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+                                <h4 style="margin: 0 0 0.5rem 0; color: #1e293b;">Parcel ${feature.properties.id}</h4>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Address:</strong> ${feature.properties.address}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Zoning:</strong> ${feature.properties.zoning}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Area:</strong> ${feature.properties.area.toLocaleString()} sq ft</p>
+                            </div>
+                        `);
+                        
+                        layer.on('click', function() {
+                            showInfoPanel('Property Parcel', feature.properties.address, 
+                                `Zoning: ${feature.properties.zoning} • Area: ${feature.properties.area.toLocaleString()} sq ft`);
+                        });
+                    }
+                });
+                
+                if (layerVisibility.parcels) {
+                    layers.parcels.addTo(map);
+                }
+            }
+            
+            // Add stations layer
+            if (gisData.stations) {
+                layers.stations = L.geoJSON(gisData.stations, {
+                    pointToLayer: function(feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 8,
+                            fillColor: '#3b82f6',
+                            color: '#1d4ed8',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+                                <h4 style="margin: 0 0 0.5rem 0; color: #1e293b;">${feature.properties.name}</h4>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Type:</strong> ${feature.properties.type || 'LIRR Station'}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Lines:</strong> ${feature.properties.lines || 'Multiple'}</p>
+                            </div>
+                        `);
+                        
+                        layer.on('click', function() {
+                            showInfoPanel('LIRR Station', feature.properties.name, 
+                                `Type: ${feature.properties.type || 'LIRR Station'} • Lines: ${feature.properties.lines || 'Multiple'}`);
+                        });
+                    }
+                });
+                
+                if (layerVisibility.stations) {
+                    layers.stations.addTo(map);
+                }
+            }
+            
+            // Add flood zones layer
+            if (gisData.flood) {
+                layers.flood = L.geoJSON(gisData.flood, {
+                    style: function(feature) {
+                        const zone = feature.properties.zone;
+                        let color = '#6b7280';
+                        
+                        if (zone === 'AE') color = '#3b82f6';
+                        else if (zone === 'VE') color = '#dc2626';
+                        
+                        return {
+                            color: color,
+                            weight: 2,
+                            opacity: 0.8,
+                            fillOpacity: 0.4
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+                                <h4 style="margin: 0 0 0.5rem 0; color: #1e293b;">Flood Zone ${feature.properties.zone}</h4>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Risk Level:</strong> ${feature.properties.risk || 'Moderate'}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Base Flood Elevation:</strong> ${feature.properties.bfe || 'N/A'}</p>
+                            </div>
+                        `);
+                        
+                        layer.on('click', function() {
+                            showInfoPanel('Flood Zone', `Zone ${feature.properties.zone}`, 
+                                `Risk Level: ${feature.properties.risk || 'Moderate'} • BFE: ${feature.properties.bfe || 'N/A'}`);
+                        });
+                    }
+                });
+                
+                if (layerVisibility.flood) {
+                    layers.flood.addTo(map);
+                }
+            }
+            
+            console.log('✅ Layers added to map');
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show/hide tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabName + '-tab').style.display = 'block';
+        }
+
+        // Layer selection
+        function selectLayer(layerName) {
+            selectedLayer = layerName;
+            
+            // Update layer items
+            document.querySelectorAll('.layer-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.layer-item').classList.add('active');
+        }
+
+        // Toggle layer visibility
+        function toggleLayer(layerName, event) {
+            event.stopPropagation();
+            
+            layerVisibility[layerName] = !layerVisibility[layerName];
+            const toggle = event.target;
+            
+            if (layerVisibility[layerName]) {
+                toggle.classList.add('active');
+                toggle.textContent = '✓';
+                if (layers[layerName]) {
+                    layers[layerName].addTo(map);
+                }
+            } else {
+                toggle.classList.remove('active');
+                toggle.textContent = '';
+                if (layers[layerName]) {
+                    map.removeLayer(layers[layerName]);
+                }
+            }
+        }
+
+        // Show layer menu
+        function showLayerMenu(layerName, event) {
+            event.stopPropagation();
+            console.log('Layer menu for:', layerName);
+        }
+
+        // Add new layer
+        function addNewLayer() {
+            console.log('Add new layer');
+        }
+
+        // Show info panel
+        function showInfoPanel(title, description, details) {
+            document.getElementById('info-title').textContent = title;
+            document.getElementById('info-description').textContent = description;
+            document.getElementById('info-details').textContent = details;
+            document.getElementById('info-panel').style.display = 'block';
+        }
+
+        // Toggle panel (mobile)
+        function togglePanel() {
+            document.querySelector('.left-panel').classList.toggle('open');
+        }
+
+        // Reset view
+        function resetView() {
+            map.setView([40.7259, -73.5143], 10);
+        }
+
+        // Export map
+        function exportMap() {
+            console.log('Export map');
+        }
+
+        // Initialize everything
+        initMap();
+        loadGISData();
+        
+        console.log('✅ Professional GIS Interface initialized');
+    </script>
+</body>
+</html>
+
+

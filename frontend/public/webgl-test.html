@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebGL Test</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 500px;
+            border: 3px solid red;
+            background-color: yellow;
+        }
+        .debug {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #c62828;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebGL Diagnostic Test</h1>
+    
+    <div class="debug">
+        <p><strong>Status:</strong> <span id="status">Starting...</span></p>
+        <p><strong>WebGL Support:</strong> <span id="webgl">Checking...</span></p>
+        <p><strong>Container Size:</strong> <span id="size">Checking...</span></p>
+        <p><strong>Mapbox Version:</strong> <span id="version">Loading...</span></p>
+    </div>
+    
+    <div id="map"></div>
+    
+    <div id="diagnostics"></div>
+
+    <script>
+        console.log('🔍 Starting WebGL diagnostic test...');
+        
+        // Check WebGL support
+        function checkWebGL() {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            const webglSupported = !!gl;
+            
+            document.getElementById('webgl').textContent = webglSupported ? '✅ Supported' : '❌ Not Supported';
+            
+            if (webglSupported) {
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
+                console.log('🎮 WebGL Renderer:', renderer);
+                
+                const diagnostics = document.getElementById('diagnostics');
+                diagnostics.innerHTML += `<div class="success">✅ WebGL is supported<br>Renderer: ${renderer}</div>`;
+            } else {
+                const diagnostics = document.getElementById('diagnostics');
+                diagnostics.innerHTML += `<div class="error">❌ WebGL is not supported. This is likely the cause of the map not rendering.</div>`;
+            }
+            
+            return webglSupported;
+        }
+        
+        // Check container size
+        function checkSize() {
+            const mapDiv = document.getElementById('map');
+            const rect = mapDiv.getBoundingClientRect();
+            document.getElementById('size').textContent = `${rect.width}x${rect.height}px`;
+            console.log('📏 Container size:', rect.width, 'x', rect.height);
+            
+            if (rect.width === 0 || rect.height === 0) {
+                const diagnostics = document.getElementById('diagnostics');
+                diagnostics.innerHTML += `<div class="error">❌ Map container has zero dimensions: ${rect.width}x${rect.height}px</div>`;
+            }
+        }
+        
+        // Check Mapbox version
+        document.getElementById('version').textContent = mapboxgl.version || 'Unknown';
+        console.log('🗺️ Mapbox version:', mapboxgl.version);
+        
+        // Run initial checks
+        const webglSupported = checkWebGL();
+        checkSize();
+        
+        // Check again after a short delay
+        setTimeout(checkSize, 100);
+        
+        if (!webglSupported) {
+            document.getElementById('status').textContent = 'WebGL not supported - map will not render';
+            return;
+        }
+        
+        try {
+            // Set access token
+            mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+            console.log('✅ Access token set');
+            
+            // Create map with error handling
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [-73.5143, 40.7259],
+                zoom: 10,
+                antialias: false, // Disable antialiasing to help with some WebGL issues
+                preserveDrawingBuffer: true // Help with some rendering issues
+            });
+            
+            console.log('✅ Map instance created');
+            
+            map.on('load', function() {
+                console.log('✅ Map loaded successfully');
+                document.getElementById('status').textContent = 'Map loaded successfully!';
+                
+                const diagnostics = document.getElementById('diagnostics');
+                diagnostics.innerHTML += `<div class="success">✅ Map loaded successfully with WebGL rendering</div>`;
+                
+                // Add a marker
+                new mapboxgl.Marker({ color: 'red' })
+                    .setLngLat([-73.5143, 40.7259])
+                    .addTo(map);
+                
+                console.log('✅ Marker added');
+            });
+            
+            map.on('error', function(e) {
+                console.error('❌ Map error:', e);
+                document.getElementById('status').textContent = 'Error: ' + (e.error ? e.error.message : 'Unknown error');
+                
+                const diagnostics = document.getElementById('diagnostics');
+                diagnostics.innerHTML += `<div class="error">❌ Map error: ${e.error ? e.error.message : 'Unknown error'}</div>`;
+            });
+            
+            map.on('style.load', function() {
+                console.log('✅ Map style loaded');
+                const diagnostics = document.getElementById('diagnostics');
+                diagnostics.innerHTML += `<div class="success">✅ Map style loaded</div>`;
+            });
+            
+            map.on('sourcedata', function(e) {
+                if (e.isSourceLoaded) {
+                    console.log('✅ Source data loaded:', e.sourceId);
+                }
+            });
+            
+            // Check size after map creation
+            setTimeout(checkSize, 500);
+            
+        } catch (error) {
+            console.error('❌ Script error:', error);
+            document.getElementById('status').textContent = 'Script error: ' + error.message;
+            
+            const diagnostics = document.getElementById('diagnostics');
+            diagnostics.innerHTML += `<div class="error">❌ Script error: ${error.message}</div>`;
+        }
+    </script>
+</body>
+</html>
+
+

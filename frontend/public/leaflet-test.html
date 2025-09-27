@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaflet Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 20px; font-family: Arial, sans-serif; }
+        .status { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        #map { width: 100%; height: 400px; border: 2px solid red; background: yellow; }
+    </style>
+</head>
+<body>
+    <h1>Leaflet Map Test</h1>
+    
+    <div class="status">
+        <p><strong>Leaflet Status:</strong> <span id="leaflet-status">Testing...</span></p>
+        <p><strong>Map Status:</strong> <span id="map-status">Testing...</span></p>
+    </div>
+    
+    <div id="map">Map will appear here...</div>
+
+    <script>
+        console.log('🍃 Starting Leaflet test...');
+        
+        // Test if Leaflet loaded
+        if (typeof L !== 'undefined') {
+            document.getElementById('leaflet-status').textContent = '✅ Leaflet Loaded';
+            document.getElementById('leaflet-status').className = 'status success';
+            console.log('✅ Leaflet loaded');
+            
+            try {
+                // Create Leaflet map
+                const map = L.map('map').setView([40.7259, -73.5143], 10);
+                
+                // Add OpenStreetMap tiles
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                
+                // Add a marker
+                L.marker([40.7259, -73.5143]).addTo(map)
+                    .bindPopup('Nassau County, NY')
+                    .openPopup();
+                
+                document.getElementById('map-status').textContent = '✅ Map Created Successfully';
+                document.getElementById('map-status').className = 'status success';
+                document.getElementById('map').style.background = 'lightgreen';
+                
+                console.log('✅ Leaflet map created successfully');
+                
+            } catch (error) {
+                console.error('❌ Leaflet map error:', error);
+                document.getElementById('map-status').textContent = '❌ Error: ' + error.message;
+                document.getElementById('map-status').className = 'status error';
+                document.getElementById('map').style.background = 'lightcoral';
+            }
+            
+        } else {
+            document.getElementById('leaflet-status').textContent = '❌ Leaflet Not Loaded';
+            document.getElementById('leaflet-status').className = 'status error';
+            console.log('❌ Leaflet not loaded');
+        }
+        
+    </script>
+</body>
+</html>
+
+

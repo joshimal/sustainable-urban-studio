@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flood Data Debug</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+        }
+        #map {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #404040;
+        }
+        .debug-info {
+            background: #2d2d2d;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            border: 1px solid #404040;
+        }
+        .status {
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+        }
+        .success { background: #22c55e; color: white; }
+        .error { background: #ef4444; color: white; }
+        .info { background: #3b82f6; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Flood Data Debug</h1>
+    
+    <div class="debug-info">
+        <h3>Debug Information</h3>
+        <div id="debug-status">Loading...</div>
+    </div>
+    
+    <div id="map"></div>
+
+    <script>
+        console.log('🌊 Starting flood data debug...');
+        
+        let map;
+        let floodData = null;
+        
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([40.7259, -73.5143], 12); // Zoomed in more to see small features
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            console.log('✅ Map initialized');
+        }
+        
+        // Load and display flood data
+        async function loadFloodData() {
+            try {
+                console.log('🔄 Loading flood data...');
+                document.getElementById('debug-status').innerHTML = '<div class="status info">Loading flood data...</div>';
+                
+                const response = await fetch('http://localhost:3001/api/qgis/nassau/get-data?type=flood_zones');
+                const result = await response.json();
+                
+                console.log('📊 Flood data response:', result);
+                
+                if (result.success && result.data && result.data.features) {
+                    floodData = result.data;
+                    
+                    document.getElementById('debug-status').innerHTML = `
+                        <div class="status success">✅ Flood data loaded successfully</div>
+                        <div class="status info">Features: ${floodData.features.length}</div>
+                        <div class="status info">Type: ${result.type}</div>
+                    `;
+                    
+                    // Add flood zones to map with very visible styling
+                    const floodLayer = L.geoJSON(floodData, {
+                        style: function(feature) {
+                            const zone = feature.properties.zone;
+                            console.log('🎨 Styling flood zone:', zone, feature.properties);
+                            
+                            let color = '#ff0000'; // Bright red by default
+                            
+                            if (zone === 'AE') {
+                                color = '#3b82f6'; // Blue
+                            } else if (zone === 'VE') {
+                                color = '#dc2626'; // Red
+                            }
+                            
+                            return {
+                                color: color,
+                                weight: 3, // Thick border
+                                opacity: 1,
+                                fillOpacity: 0.7, // Very visible fill
+                                fillColor: color
+                            };
+                        },
+                        onEachFeature: function(feature, layer) {
+                            console.log('📍 Adding flood zone feature:', feature.properties);
+                            
+                            layer.bindPopup(`
+                                <div style="font-family: Arial, sans-serif; color: #1e293b;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: #1e293b;">Flood Zone ${feature.properties.zone}</h4>
+                                    <p style="margin: 0.25rem 0; color: #64748b;"><strong>Description:</strong> ${feature.properties.description}</p>
+                                    <p style="margin: 0.25rem 0; color: #64748b;"><strong>ID:</strong> ${feature.properties.id}</p>
+                                    <p style="margin: 0.25rem 0; color: #64748b;"><strong>Zone Type:</strong> ${feature.properties.zone}</p>
+                                </div>
+                            `);
+                        }
+                    });
+                    
+                    floodLayer.addTo(map);
+                    
+                    // Fit map to show all flood zones
+                    if (floodData.features.length > 0) {
+                        const group = new L.featureGroup([floodLayer]);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    }
+                    
+                    console.log('✅ Flood zones added to map');
+                    
+                } else {
+                    document.getElementById('debug-status').innerHTML = '<div class="status error">❌ No flood data found</div>';
+                    console.error('❌ No flood data in response:', result);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading flood data:', error);
+                document.getElementById('debug-status').innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Add some test markers to help locate the area
+        function addTestMarkers() {
+            // Add markers at the corners of the flood zones
+            const testPoints = [
+                { lat: 40.74, lng: -73.66, label: 'Flood Zone 1' },
+                { lat: 40.75, lng: -73.65, label: 'Flood Zone 1' },
+                { lat: 40.73, lng: -73.67, label: 'Flood Zone 2' },
+                { lat: 40.74, lng: -73.66, label: 'Flood Zone 2' }
+            ];
+            
+            testPoints.forEach(point => {
+                L.marker([point.lat, point.lng])
+                    .addTo(map)
+                    .bindPopup(`<strong>${point.label}</strong><br>Test marker to help locate flood zones`);
+            });
+        }
+        
+        // Initialize everything
+        initMap();
+        loadFloodData();
+        addTestMarkers();
+        
+        console.log('✅ Flood debug initialized');
+    </script>
+</body>
+</html>
+
+

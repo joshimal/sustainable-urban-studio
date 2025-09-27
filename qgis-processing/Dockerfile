@@ -6,15 +6,10 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install \
+RUN pip3 install --upgrade pip && \
+    pip3 install --ignore-installed \
     flask \
-    flask-cors \
-    numpy \
-    pandas \
-    geopandas \
-    rasterio \
-    shapely \
-    psycopg2-binary
+    flask-cors
 
 # Set up QGIS environment
 ENV PYTHONPATH="${PYTHONPATH}:/usr/share/qgis/python"
@@ -28,4 +23,4 @@ COPY . .
 EXPOSE 5000
 
 # Start the Flask server
-CMD ["python3", "qgis_server.py"]
+CMD ["python3", "minimal_server.py"]

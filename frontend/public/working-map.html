@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UrbanSync - Working Map Interface</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .mapboxgl-map {
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        }
+        .mapboxgl-popup-content {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        function App() {
+            const [gisData, setGisData] = useState({
+                parcels: null,
+                stations: null,
+                flood_zones: null,
+                loading: true,
+                error: null
+            });
+            
+            const [selectedLayers, setSelectedLayers] = useState({
+                parcels: true,
+                stations: true,
+                flood_zones: true
+            });
+            
+            const [map, setMap] = useState(null);
+
+            useEffect(() => {
+                const loadGISData = async () => {
+                    try {
+                        console.log('🔄 Loading GIS data...');
+                        
+                        const [parcelsRes, stationsRes, floodRes] = await Promise.all([
+                            fetch('http://localhost:3001/api/qgis/nassau/get-data?type=parcels'),
+                            fetch('http://localhost:3001/api/qgis/nassau/get-data?type=stations'),
+                            fetch('http://localhost:3001/api/qgis/nassau/get-data?type=flood_zones')
+                        ]);
+                        
+                        const parcels = await parcelsRes.json();
+                        const stations = await stationsRes.json();
+                        const flood_zones = await floodRes.json();
+                        
+                        console.log('✅ GIS data loaded successfully');
+                        
+                        setGisData({
+                            parcels: parcels.data,
+                            stations: stations.data,
+                            flood_zones: flood_zones.data,
+                            loading: false,
+                            error: null
+                        });
+                        
+                    } catch (error) {
+                        console.error('❌ Error loading GIS data:', error);
+                        setGisData(prev => ({
+                            ...prev,
+                            loading: false,
+                            error: error.message || 'Unknown error'
+                        }));
+                    }
+                };
+                
+                loadGISData();
+            }, []);
+
+            useEffect(() => {
+                if (gisData.loading || gisData.error) return;
+                
+                console.log('🗺️ Initializing Mapbox...');
+                
+                // Initialize Mapbox
+                mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+                
+                const mapInstance = new mapboxgl.Map({
+                    container: 'map',
+                    style: 'mapbox://styles/mapbox/streets-v12',
+                    center: [-73.5143, 40.7259],
+                    zoom: 10
+                });
+                
+                console.log('✅ Mapbox initialized successfully');
+                setMap(mapInstance);
+                
+                // Add layers when data is available
+                mapInstance.on('load', () => {
+                    console.log('🗺️ Map loaded, adding layers...');
+                    
+                    // Add parcels layer
+                    if (gisData.parcels) {
+                        mapInstance.addSource('parcels', {
+                            type: 'geojson',
+                            data: gisData.parcels
+                        });
+                        
+                        mapInstance.addLayer({
+                            id: 'parcels-fill',
+                            type: 'fill',
+                            source: 'parcels',
+                            paint: {
+                                'fill-color': [
+                                    'case',
+                                    ['==', ['get', 'zoning'], 'R-1'], '#22c55e',
+                                    ['==', ['get', 'zoning'], 'R-2'], '#fbbf24',
+                                    ['==', ['get', 'zoning'], 'C-1'], '#ef4444',
+                                    '#6b7280'
+                                ],
+                                'fill-opacity': 0.6
+                            }
+                        });
+                        
+                        mapInstance.addLayer({
+                            id: 'parcels-outline',
+                            type: 'line',
+                            source: 'parcels',
+                            paint: {
+                                'line-color': '#ffffff',
+                                'line-width': 1
+                            }
+                        });
+                        
+                        console.log('✅ Parcels layer added');
+                    }
+                    
+                    // Add stations layer
+                    if (gisData.stations) {
+                        mapInstance.addSource('stations', {
+                            type: 'geojson',
+                            data: gisData.stations
+                        });
+                        
+                        mapInstance.addLayer({
+                            id: 'stations-symbol',
+                            type: 'symbol',
+                            source: 'stations',
+                            layout: {
+                                'icon-image': 'railway-15',
+                                'icon-size': 1.5,
+                                'text-field': ['get', 'name'],
+                                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                                'text-offset': [0, 2],
+                                'text-anchor': 'top'
+                            },
+                            paint: {
+                                'text-color': '#1f2937',
+                                'text-halo-color': '#ffffff',
+                                'text-halo-width': 1
+                            }
+                        });
+                        
+                        console.log('✅ Stations layer added');
+                    }
+                    
+                    // Add flood zones layer
+                    if (gisData.flood_zones) {
+                        mapInstance.addSource('flood-zones', {
+                            type: 'geojson',
+                            data: gisData.flood_zones
+                        });
+                        
+                        mapInstance.addLayer({
+                            id: 'flood-zones-fill',
+                            type: 'fill',
+                            source: 'flood-zones',
+                            paint: {
+                                'fill-color': [
+                                    'case',
+                                    ['==', ['get', 'zone'], 'AE'], '#3b82f6',
+                                    ['==', ['get', 'zone'], 'VE'], '#dc2626',
+                                    '#6b7280'
+                                ],
+                                'fill-opacity': 0.4
+                            }
+                        });
+                        
+                        console.log('✅ Flood zones layer added');
+                    }
+                });
+                
+                return () => {
+                    if (mapInstance) {
+                        mapInstance.remove();
+                    }
+                };
+            }, [gisData]);
+
+            const toggleLayer = (layer) => {
+                setSelectedLayers(prev => ({
+                    ...prev,
+                    [layer]: !prev[layer]
+                }));
+                
+                if (map) {
+                    const visibility = selectedLayers[layer] ? 'none' : 'visible';
+                    map.setLayoutProperty(layer + '-fill', 'visibility', visibility);
+                    map.setLayoutProperty(layer + '-outline', 'visibility', visibility);
+                    map.setLayoutProperty(layer + '-symbol', 'visibility', visibility);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+                    {/* Top Navigation */}
+                    <div className="bg-white shadow-sm border-b border-slate-200">
+                        <div className="px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl font-bold text-slate-900">UrbanSync</h1>
+                                    <p className="text-sm text-slate-600">Sustainable Urban Planning</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex h-[calc(100vh-80px)]">
+                        {/* Big Map Area (75% width) */}
+                        <div className="flex-1 relative">
+                            <div className="h-full m-4 rounded-xl shadow-xl overflow-hidden bg-white">
+                                {gisData.loading ? (
+                                    <div className="flex items-center justify-center h-full">
+                                        <div className="text-center">
+                                            <div className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4">⏳</div>
+                                            <h3 className="text-lg font-semibold text-slate-900 mb-2">Loading GIS Data...</h3>
+                                            <p className="text-slate-600">Fetching Nassau County data from the server</p>
+                                        </div>
+                                    </div>
+                                ) : gisData.error ? (
+                                    <div className="flex items-center justify-center h-full">
+                                        <div className="text-center">
+                                            <h3 className="text-lg font-semibold text-slate-900 mb-2">Error Loading Data</h3>
+                                            <p className="text-slate-600 mb-4">{gisData.error}</p>
+                                            <button 
+                                                onClick={() => window.location.reload()} 
+                                                className="px-4 py-2 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50"
+                                            >
+                                                Retry
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="relative h-full">
+                                        <div id="map"></div>
+                                        
+                                        {/* Layer Controls */}
+                                        <div className="absolute top-4 left-4 z-10 w-64 bg-white rounded-lg shadow-lg p-4">
+                                            <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                </svg>
+                                                Map Layers
+                                            </h3>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                        </svg>
+                                                        <span className="text-sm font-medium">Parcels</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleLayer('parcels')}
+                                                        className="p-1 rounded hover:bg-slate-100"
+                                                    >
+                                                        {selectedLayers.parcels ? 
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg> :
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                                                            </svg>
+                                                        }
+                                                    </button>
+                                                </div>
+                                                
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                                        </svg>
+                                                        <span className="text-sm font-medium">LIRR Stations</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleLayer('stations')}
+                                                        className="p-1 rounded hover:bg-slate-100"
+                                                    >
+                                                        {selectedLayers.stations ? 
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg> :
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                                                            </svg>
+                                                        }
+                                                    </button>
+                                                </div>
+                                                
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                                        </svg>
+                                                        <span className="text-sm font-medium">Flood Zones</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleLayer('flood_zones')}
+                                                        className="p-1 rounded hover:bg-slate-100"
+                                                    >
+                                                        {selectedLayers.flood_zones ? 
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg> :
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                                                            </svg>
+                                                        }
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Map Info */}
+                                        <div className="absolute top-4 right-4 z-10 bg-white rounded-lg shadow-lg p-4">
+                                            <div className="text-center">
+                                                <h3 className="font-semibold text-slate-900 mb-2">Nassau County</h3>
+                                                <div className="space-y-1 text-sm text-slate-600">
+                                                    <p>Active Layers: {Object.values(selectedLayers).filter(Boolean).length}/3</p>
+                                                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                                                        Live Data
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Data Panel (25% width) */}
+                        <div className="w-80 bg-white border-l border-slate-200 flex flex-col">
+                            <div className="p-6 border-b border-slate-200">
+                                <h2 className="text-xl font-bold text-slate-900 mb-2">Data Overview</h2>
+                                <p className="text-sm text-slate-600">Real-time Nassau County GIS data</p>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                {/* Data Summary */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+                                        <svg className="w-8 h-8 text-green-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        <div className="text-2xl font-bold text-slate-900">
+                                            {gisData.parcels?.features?.length || 0}
+                                        </div>
+                                        <div className="text-sm text-slate-600">Parcels</div>
+                                    </div>
+                                    
+                                    <div className="bg-white border border-slate-200 rounded-lg p-4 text-center">
+                                        <svg className="w-8 h-8 text-blue-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                        </svg>
+                                        <div className="text-2xl font-bold text-slate-900">
+                                            {gisData.stations?.features?.length || 0}
+                                        </div>
+                                        <div className="text-sm text-slate-600">Stations</div>
+                                    </div>
+                                </div>
+
+                                {/* Data Details */}
+                                <div className="bg-white border border-slate-200 rounded-lg p-4">
+                                    <h3 className="text-lg font-semibold text-slate-900 mb-3">GIS Data Status</h3>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-slate-600">Parcels:</span>
+                                            <span className="text-sm font-medium text-slate-900">
+                                                {gisData.parcels?.features?.length || 0} features
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-slate-600">Stations:</span>
+                                            <span className="text-sm font-medium text-slate-900">
+                                                {gisData.stations?.features?.length || 0} features
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-slate-600">Flood Zones:</span>
+                                            <span className="text-sm font-medium text-slate-900">
+                                                {gisData.flood_zones?.features?.length || 0} features
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+

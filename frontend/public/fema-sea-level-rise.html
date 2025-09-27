@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UrbanSync - FEMA Sea Level Rise Analysis</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* Left Panel - FEMA Sea Level Rise Controls */
+        .left-panel {
+            width: 400px;
+            background: #2d2d2d;
+            border-right: 1px solid #404040;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        
+        .panel-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #404040;
+            background: #1f1f1f;
+        }
+        
+        .panel-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .panel-subtitle {
+            font-size: 0.875rem;
+            color: #a0a0a0;
+        }
+        
+        .panel-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        
+        .section {
+            margin-bottom: 2rem;
+        }
+        
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-icon {
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+        }
+        
+        /* FEMA Sea Level Rise Controls */
+        .fema-controls {
+            background: #1f1f1f;
+            border-radius: 12px;
+            border: 1px solid #404040;
+            padding: 1.5rem;
+        }
+        
+        .slider-container {
+            margin-bottom: 2rem;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .slider-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .slider-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #3b82f6;
+            background: #1e40af;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #404040;
+            outline: none;
+            -webkit-appearance: none;
+            margin-bottom: 1rem;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .slider-marks {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #a0a0a0;
+            margin-top: 0.5rem;
+        }
+        
+        /* Scenario Buttons */
+        .scenario-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .scenario-btn {
+            background: #2d2d2d;
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .scenario-btn:hover {
+            background: #404040;
+            border-color: #6b7280;
+        }
+        
+        .scenario-btn.active {
+            background: #1e40af;
+            border-color: #3b82f6;
+        }
+        
+        .scenario-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .scenario-desc {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+        }
+        
+        /* FEMA Risk Analysis */
+        .fema-risk-analysis {
+            background: #1f1f1f;
+            border-radius: 12px;
+            border: 1px solid #404040;
+            padding: 1.5rem;
+        }
+        
+        .risk-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #404040;
+        }
+        
+        .risk-item:last-child {
+            border-bottom: none;
+        }
+        
+        .risk-label {
+            color: #a0a0a0;
+            font-size: 0.875rem;
+        }
+        
+        .risk-value {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        
+        .risk-value.extreme {
+            color: #dc2626;
+        }
+        
+        .risk-value.high {
+            color: #ea580c;
+        }
+        
+        .risk-value.moderate {
+            color: #d97706;
+        }
+        
+        .risk-value.low {
+            color: #16a34a;
+        }
+        
+        /* Loading States */
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #a0a0a0;
+            font-size: 0.875rem;
+        }
+        
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #404040;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Map Container */
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: #1a1a1a;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Map Controls */
+        .map-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .control-btn {
+            width: 44px;
+            height: 44px;
+            background: rgba(45, 45, 45, 0.95);
+            border: 1px solid #404040;
+            border-radius: 8px;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-btn:hover {
+            background: rgba(59, 130, 246, 0.9);
+            border-color: #3b82f6;
+        }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(45, 45, 45, 0.95);
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        .legend-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #ffffff;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+        
+        .legend-label {
+            font-size: 0.875rem;
+            color: #a0a0a0;
+        }
+        
+        /* Status Messages */
+        .status-message {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(45, 45, 45, 0.95);
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        .status-success {
+            border-color: #16a34a;
+            background: rgba(22, 163, 74, 0.1);
+        }
+        
+        .status-error {
+            border-color: #dc2626;
+            background: rgba(220, 38, 38, 0.1);
+        }
+        
+        .status-warning {
+            border-color: #d97706;
+            background: rgba(217, 119, 6, 0.1);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .left-panel {
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: -100%;
+                transition: left 0.3s;
+                z-index: 2000;
+            }
+            
+            .left-panel.open {
+                left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Panel - FEMA Sea Level Rise Controls -->
+        <div class="left-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    🏛️ FEMA Sea Level Rise
+                    <div class="loading" id="api-status">
+                        <div class="spinner"></div>
+                        <span>Connecting to FEMA API...</span>
+                    </div>
+                </div>
+                <div class="panel-subtitle">Federal Emergency Management Agency Risk Analysis</div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- FEMA Sea Level Rise Controls -->
+                <div class="section">
+                    <div class="section-title">
+                        <div class="section-icon">📊</div>
+                        Sea Level Rise Projection
+                    </div>
+                    
+                    <div class="fema-controls">
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span class="slider-title">Rise Level</span>
+                                <span class="slider-value" id="rise-value">0 ft</span>
+                            </div>
+                            <input type="range" 
+                                   class="slider" 
+                                   id="rise-slider" 
+                                   min="0" 
+                                   max="10" 
+                                   step="0.5" 
+                                   value="0"
+                                   oninput="updateSeaLevel(this.value)">
+                            <div class="slider-marks">
+                                <span>0 ft</span>
+                                <span>2.5 ft</span>
+                                <span>5 ft</span>
+                                <span>7.5 ft</span>
+                                <span>10 ft</span>
+                            </div>
+                        </div>
+                        
+                        <div class="scenario-buttons">
+                            <div class="scenario-btn active" onclick="setScenario('current', 0)">
+                                <div class="scenario-title">Current</div>
+                                <div class="scenario-desc">2024 baseline</div>
+                            </div>
+                            <div class="scenario-btn" onclick="setScenario('2030', 1.5)">
+                                <div class="scenario-title">2030</div>
+                                <div class="scenario-desc">+1.5 ft</div>
+                            </div>
+                            <div class="scenario-btn" onclick="setScenario('2050', 3)">
+                                <div class="scenario-title">2050</div>
+                                <div class="scenario-desc">+3 ft</div>
+                            </div>
+                            <div class="scenario-btn" onclick="setScenario('2100', 6)">
+                                <div class="scenario-title">2100</div>
+                                <div class="scenario-desc">+6 ft</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- FEMA Risk Analysis -->
+                <div class="section">
+                    <div class="section-title">
+                        <div class="section-icon">📈</div>
+                        FEMA Risk Analysis
+                    </div>
+                    
+                    <div class="fema-risk-analysis">
+                        <div class="risk-item">
+                            <span class="risk-label">Overall Risk</span>
+                            <span class="risk-value" id="overall-risk">Loading...</span>
+                        </div>
+                        <div class="risk-item">
+                            <span class="risk-label">Flood Risk</span>
+                            <span class="risk-value" id="flood-risk">Loading...</span>
+                        </div>
+                        <div class="risk-item">
+                            <span class="risk-label">Sea Level Rise Risk</span>
+                            <span class="risk-value" id="slr-risk">Loading...</span>
+                        </div>
+                        <div class="risk-item">
+                            <span class="risk-label">Social Vulnerability</span>
+                            <span class="risk-value" id="social-vuln">Loading...</span>
+                        </div>
+                        <div class="risk-item">
+                            <span class="risk-label">Community Resilience</span>
+                            <span class="risk-value" id="community-resilience">Loading...</span>
+                        </div>
+                        <div class="risk-item">
+                            <span class="risk-label">Base Flood Elevation</span>
+                            <span class="risk-value" id="bfe">Loading...</span>
+                        </div>
+                        <div class="risk-item">
+                            <span class="risk-label">Flood Zone</span>
+                            <span class="risk-value" id="flood-zone">Loading...</span>
+                        </div>
+                        <div class="risk-item">
+                            <span class="risk-label">Inundation Probability</span>
+                            <span class="risk-value" id="inundation-prob">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <div class="control-btn" onclick="togglePanel()" title="Toggle Panel">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+                    </svg>
+                </div>
+                <div class="control-btn" onclick="resetView()" title="Reset View">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                </div>
+                <div class="control-btn" onclick="exportAnalysis()" title="Export Analysis">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-title">FEMA Risk Levels</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #16a34a;"></div>
+                    <span class="legend-label">Low Risk</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #d97706;"></div>
+                    <span class="legend-label">Moderate Risk</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ea580c;"></div>
+                    <span class="legend-label">High Risk</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #dc2626;"></div>
+                    <span class="legend-label">Extreme Risk</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🏛️ Starting FEMA Sea Level Rise Analysis...');
+        
+        let map;
+        let currentLocation = { lat: 40.7259, lng: -73.5143 }; // Nassau County
+        let currentScenario = 'current';
+        let currentRiseLevel = 0;
+        let femaData = null;
+        let seaLevelRiseLayer = null;
+        
+        // Initialize map
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([currentLocation.lat, currentLocation.lng], 11);
+            
+            // Add base layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            console.log('✅ Map initialized');
+        }
+        
+        // Check FEMA API connection
+        async function checkFEMAConnection() {
+            try {
+                const response = await fetch('http://localhost:3001/api/gis/fema-sea-level-rise/scenarios');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('api-status').innerHTML = '✅ Connected to FEMA API';
+                    document.getElementById('api-status').className = 'status-message status-success';
+                    return true;
+                } else {
+                    throw new Error('FEMA API not responding');
+                }
+            } catch (error) {
+                console.error('❌ FEMA API connection failed:', error);
+                document.getElementById('api-status').innerHTML = '⚠️ FEMA API unavailable - using mock data';
+                document.getElementById('api-status').className = 'status-message status-warning';
+                return false;
+            }
+        }
+        
+        // Load FEMA sea level rise data
+        async function loadFEMAData() {
+            try {
+                console.log('🔄 Loading FEMA sea level rise data...');
+                
+                const response = await fetch(`http://localhost:3001/api/gis/fema-sea-level-rise/data?lat=${currentLocation.lat}&lng=${currentLocation.lng}&scenario=${currentScenario}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    femaData = data.data;
+                    updateRiskDisplay();
+                    updateSeaLevelRiseVisualization();
+                    console.log('✅ FEMA data loaded');
+                } else {
+                    throw new Error(data.error);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading FEMA data:', error);
+                // Use mock data as fallback
+                femaData = getMockFEMAData();
+                updateRiskDisplay();
+                updateSeaLevelRiseVisualization();
+            }
+        }
+        
+        // Update risk display
+        function updateRiskDisplay() {
+            if (!femaData) return;
+            
+            const riskIndex = femaData.riskIndex || {};
+            const floodRisk = femaData.floodRisk || {};
+            
+            document.getElementById('overall-risk').textContent = riskIndex.overallRisk || 'Unknown';
+            document.getElementById('overall-risk').className = `risk-value ${(riskIndex.overallRisk || '').toLowerCase()}`;
+            
+            document.getElementById('flood-risk').textContent = riskIndex.floodRisk || 'Unknown';
+            document.getElementById('flood-risk').className = `risk-value ${(riskIndex.floodRisk || '').toLowerCase()}`;
+            
+            document.getElementById('slr-risk').textContent = riskIndex.seaLevelRiseRisk || 'Unknown';
+            document.getElementById('slr-risk').className = `risk-value ${(riskIndex.seaLevelRiseRisk || '').toLowerCase()}`;
+            
+            document.getElementById('social-vuln').textContent = riskIndex.socialVulnerability || 'Unknown';
+            document.getElementById('social-vuln').className = `risk-value ${(riskIndex.socialVulnerability || '').toLowerCase()}`;
+            
+            document.getElementById('community-resilience').textContent = riskIndex.communityResilience || 'Unknown';
+            document.getElementById('community-resilience').className = `risk-value ${(riskIndex.communityResilience || '').toLowerCase()}`;
+            
+            document.getElementById('bfe').textContent = `${(floodRisk.baseFloodElevation || 0).toFixed(1)} ft`;
+            document.getElementById('flood-zone').textContent = floodRisk.floodZone || 'Unknown';
+            document.getElementById('inundation-prob').textContent = `${Math.round((floodRisk.inundationProbability || 0) * 100)}%`;
+        }
+        
+        // Update sea level rise visualization
+        function updateSeaLevelRiseVisualization() {
+            // Remove existing sea level rise layer
+            if (seaLevelRiseLayer) {
+                map.removeLayer(seaLevelRiseLayer);
+            }
+            
+            // Create flood zones based on FEMA data
+            const floodZones = createFEMAFloodZones();
+            
+            if (floodZones.features.length > 0) {
+                seaLevelRiseLayer = L.geoJSON(floodZones, {
+                    style: function(feature) {
+                        const riskLevel = feature.properties.riskLevel;
+                        let color = '#16a34a'; // Low risk - green
+                        
+                        if (riskLevel === 'extreme') {
+                            color = '#dc2626'; // Extreme risk - red
+                        } else if (riskLevel === 'high') {
+                            color = '#ea580c'; // High risk - orange
+                        } else if (riskLevel === 'moderate') {
+                            color = '#d97706'; // Moderate risk - yellow
+                        }
+                        
+                        return {
+                            color: color,
+                            weight: 2,
+                            opacity: 0.8,
+                            fillOpacity: 0.6,
+                            fillColor: color
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+                                <h4 style="margin: 0 0 0.5rem 0; color: #1e293b;">FEMA Sea Level Rise Analysis</h4>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Scenario:</strong> ${currentScenario}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Rise Level:</strong> ${currentRiseLevel} ft</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Risk Level:</strong> ${feature.properties.riskLevel}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Flood Zone:</strong> ${feature.properties.floodZone}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>BFE:</strong> ${feature.properties.bfe} ft</p>
+                            </div>
+                        `);
+                    }
+                });
+                
+                seaLevelRiseLayer.addTo(map);
+            }
+        }
+        
+        // Create FEMA flood zones
+        function createFEMAFloodZones() {
+            if (!femaData) return { type: 'FeatureCollection', features: [] };
+            
+            // Create a simple polygon around the current location
+            const center = [currentLocation.lat, currentLocation.lng];
+            const radius = 0.01; // ~1km radius
+            
+            const polygon = {
+                type: 'Polygon',
+                coordinates: [[
+                    [center[1] - radius, center[0] - radius],
+                    [center[1] + radius, center[0] - radius],
+                    [center[1] + radius, center[0] + radius],
+                    [center[1] - radius, center[0] + radius],
+                    [center[1] - radius, center[0] - radius]
+                ]]
+            };
+            
+            const floodRisk = femaData.floodRisk || {};
+            const riskLevel = floodRisk.riskLevel || 'low';
+            
+            return {
+                type: 'FeatureCollection',
+                features: [{
+                    type: 'Feature',
+                    geometry: polygon,
+                    properties: {
+                        riskLevel: riskLevel,
+                        floodZone: floodRisk.floodZone || 'X',
+                        bfe: (floodRisk.baseFloodElevation || 0).toFixed(1),
+                        riseLevel: currentRiseLevel,
+                        scenario: currentScenario
+                    }
+                }]
+            };
+        }
+        
+        // Get mock FEMA data
+        function getMockFEMAData() {
+            return {
+                location: currentLocation,
+                scenario: { name: 'Current (2024)', year: 2024, rise: currentRiseLevel },
+                riskIndex: {
+                    overallRisk: 'Moderate',
+                    floodRisk: 'Moderate',
+                    seaLevelRiseRisk: 'Low',
+                    socialVulnerability: 'Moderate',
+                    communityResilience: 'Moderate'
+                },
+                floodRisk: {
+                    baseFloodElevation: Math.random() * 20 + 5,
+                    adjustedBFE: Math.random() * 20 + 5 + currentRiseLevel,
+                    floodZone: 'AE',
+                    riskLevel: currentRiseLevel >= 5 ? 'high' : currentRiseLevel >= 2 ? 'moderate' : 'low',
+                    inundationProbability: currentRiseLevel >= 5 ? 0.5 : currentRiseLevel >= 2 ? 0.2 : 0.05
+                },
+                elevation: {
+                    elevation: Math.random() * 50 + 10,
+                    units: 'feet',
+                    source: 'mock'
+                },
+                timestamp: new Date().toISOString(),
+                source: 'FEMA Sea Level Rise Service (Mock)'
+            };
+        }
+        
+        // Update sea level rise
+        function updateSeaLevel(value) {
+            currentRiseLevel = parseFloat(value);
+            document.getElementById('rise-value').textContent = `${currentRiseLevel} ft`;
+            
+            // Update scenario based on value
+            if (currentRiseLevel === 0) {
+                currentScenario = 'current';
+            } else if (currentRiseLevel <= 1.5) {
+                currentScenario = '2030';
+            } else if (currentRiseLevel <= 3) {
+                currentScenario = '2050';
+            } else {
+                currentScenario = '2100';
+            }
+            
+            // Reload data with new scenario
+            loadFEMAData();
+        }
+        
+        // Set scenario
+        function setScenario(name, level) {
+            // Update button states
+            document.querySelectorAll('.scenario-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.scenario-btn').classList.add('active');
+            
+            // Update slider
+            document.getElementById('rise-slider').value = level;
+            currentScenario = name;
+            updateSeaLevel(level);
+        }
+        
+        // Toggle panel (mobile)
+        function togglePanel() {
+            document.querySelector('.left-panel').classList.toggle('open');
+        }
+        
+        // Reset view
+        function resetView() {
+            map.setView([currentLocation.lat, currentLocation.lng], 11);
+        }
+        
+        // Export analysis
+        function exportAnalysis() {
+            console.log('Exporting FEMA sea level rise analysis...');
+            if (femaData) {
+                const dataStr = JSON.stringify(femaData, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `fema-sea-level-rise-${currentScenario}-${Date.now()}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+        
+        // Initialize everything
+        async function init() {
+            initMap();
+            const apiConnected = await checkFEMAConnection();
+            if (apiConnected) {
+                await loadFEMAData();
+            } else {
+                femaData = getMockFEMAData();
+                updateRiskDisplay();
+                updateSeaLevelRiseVisualization();
+            }
+        }
+        
+        init();
+        
+        console.log('✅ FEMA Sea Level Rise Analysis initialized');
+    </script>
+</body>
+</html>
+
+

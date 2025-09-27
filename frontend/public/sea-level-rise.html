@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UrbanSync - Sea Level Rise Analysis</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* Left Panel - Sea Level Rise Controls */
+        .left-panel {
+            width: 400px;
+            background: #2d2d2d;
+            border-right: 1px solid #404040;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        
+        .panel-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #404040;
+            background: #1f1f1f;
+        }
+        
+        .panel-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 0.5rem;
+        }
+        
+        .panel-subtitle {
+            font-size: 0.875rem;
+            color: #a0a0a0;
+        }
+        
+        .panel-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        
+        .section {
+            margin-bottom: 2rem;
+        }
+        
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .section-icon {
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+        }
+        
+        /* Sea Level Rise Controls */
+        .sea-level-controls {
+            background: #1f1f1f;
+            border-radius: 12px;
+            border: 1px solid #404040;
+            padding: 1.5rem;
+        }
+        
+        .slider-container {
+            margin-bottom: 2rem;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .slider-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .slider-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #3b82f6;
+            background: #1e40af;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #404040;
+            outline: none;
+            -webkit-appearance: none;
+            margin-bottom: 1rem;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .slider-marks {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #a0a0a0;
+            margin-top: 0.5rem;
+        }
+        
+        /* Scenario Buttons */
+        .scenario-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .scenario-btn {
+            background: #2d2d2d;
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .scenario-btn:hover {
+            background: #404040;
+            border-color: #6b7280;
+        }
+        
+        .scenario-btn.active {
+            background: #1e40af;
+            border-color: #3b82f6;
+        }
+        
+        .scenario-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .scenario-desc {
+            font-size: 0.75rem;
+            color: #a0a0a0;
+        }
+        
+        /* Impact Analysis */
+        .impact-analysis {
+            background: #1f1f1f;
+            border-radius: 12px;
+            border: 1px solid #404040;
+            padding: 1.5rem;
+        }
+        
+        .impact-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #404040;
+        }
+        
+        .impact-item:last-child {
+            border-bottom: none;
+        }
+        
+        .impact-label {
+            color: #a0a0a0;
+            font-size: 0.875rem;
+        }
+        
+        .impact-value {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        
+        .impact-value.high {
+            color: #ef4444;
+        }
+        
+        .impact-value.medium {
+            color: #f59e0b;
+        }
+        
+        .impact-value.low {
+            color: #22c55e;
+        }
+        
+        /* Map Container */
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: #1a1a1a;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Map Controls */
+        .map-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .control-btn {
+            width: 44px;
+            height: 44px;
+            background: rgba(45, 45, 45, 0.95);
+            border: 1px solid #404040;
+            border-radius: 8px;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-btn:hover {
+            background: rgba(59, 130, 246, 0.9);
+            border-color: #3b82f6;
+        }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(45, 45, 45, 0.95);
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        .legend-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #ffffff;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+        
+        .legend-label {
+            font-size: 0.875rem;
+            color: #a0a0a0;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .left-panel {
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: -100%;
+                transition: left 0.3s;
+                z-index: 2000;
+            }
+            
+            .left-panel.open {
+                left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Panel - Sea Level Rise Controls -->
+        <div class="left-panel">
+            <div class="panel-header">
+                <div class="panel-title">🌊 Sea Level Rise</div>
+                <div class="panel-subtitle">Climate Impact Analysis for Nassau County</div>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Sea Level Rise Controls -->
+                <div class="section">
+                    <div class="section-title">
+                        <div class="section-icon">📊</div>
+                        Sea Level Rise Projection
+                    </div>
+                    
+                    <div class="sea-level-controls">
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span class="slider-title">Rise Level</span>
+                                <span class="slider-value" id="rise-value">0 ft</span>
+                            </div>
+                            <input type="range" 
+                                   class="slider" 
+                                   id="rise-slider" 
+                                   min="0" 
+                                   max="10" 
+                                   step="0.5" 
+                                   value="0"
+                                   oninput="updateSeaLevel(this.value)">
+                            <div class="slider-marks">
+                                <span>0 ft</span>
+                                <span>2.5 ft</span>
+                                <span>5 ft</span>
+                                <span>7.5 ft</span>
+                                <span>10 ft</span>
+                            </div>
+                        </div>
+                        
+                        <div class="scenario-buttons">
+                            <div class="scenario-btn active" onclick="setScenario('current', 0)">
+                                <div class="scenario-title">Current</div>
+                                <div class="scenario-desc">2024 baseline</div>
+                            </div>
+                            <div class="scenario-btn" onclick="setScenario('2030', 1)">
+                                <div class="scenario-title">2030</div>
+                                <div class="scenario-desc">+1.5 ft</div>
+                            </div>
+                            <div class="scenario-btn" onclick="setScenario('2050', 3)">
+                                <div class="scenario-title">2050</div>
+                                <div class="scenario-desc">+3 ft</div>
+                            </div>
+                            <div class="scenario-btn" onclick="setScenario('2100', 6)">
+                                <div class="scenario-title">2100</div>
+                                <div class="scenario-desc">+6 ft</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Impact Analysis -->
+                <div class="section">
+                    <div class="section-title">
+                        <div class="section-icon">📈</div>
+                        Impact Analysis
+                    </div>
+                    
+                    <div class="impact-analysis">
+                        <div class="impact-item">
+                            <span class="impact-label">Properties at Risk</span>
+                            <span class="impact-value" id="properties-risk">0</span>
+                        </div>
+                        <div class="impact-item">
+                            <span class="impact-label">Population Affected</span>
+                            <span class="impact-value" id="population-risk">0</span>
+                        </div>
+                        <div class="impact-item">
+                            <span class="impact-label">Infrastructure Impact</span>
+                            <span class="impact-value low" id="infrastructure-risk">Low</span>
+                        </div>
+                        <div class="impact-item">
+                            <span class="impact-label">Economic Impact</span>
+                            <span class="impact-value low" id="economic-risk">$0M</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <div class="control-btn" onclick="togglePanel()" title="Toggle Panel">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+                    </svg>
+                </div>
+                <div class="control-btn" onclick="resetView()" title="Reset View">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                </div>
+                <div class="control-btn" onclick="exportAnalysis()" title="Export Analysis">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-title">Sea Level Rise Impact</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <span class="legend-label">Low Risk (0-2 ft)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span class="legend-label">Medium Risk (2-5 ft)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ef4444;"></div>
+                    <span class="legend-label">High Risk (5+ ft)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🌊 Starting Sea Level Rise Analysis...');
+        
+        let map;
+        let gisData = {
+            parcels: null,
+            stations: null,
+            flood: null
+        };
+        let seaLevelRiseLayer = null;
+        let currentRiseLevel = 0;
+        
+        // Initialize map
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([40.7259, -73.5143], 11);
+            
+            // Add base layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            console.log('✅ Map initialized');
+        }
+        
+        // Load GIS data
+        async function loadGISData() {
+            try {
+                console.log('🔄 Loading GIS data...');
+                
+                const [parcelsRes, stationsRes, floodRes] = await Promise.all([
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=parcels'),
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=stations'),
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=flood_zones')
+                ]);
+                
+                const parcels = await parcelsRes.json();
+                const stations = await stationsRes.json();
+                const flood = await floodRes.json();
+                
+                gisData.parcels = parcels.data;
+                gisData.stations = stations.data;
+                gisData.flood = flood.data;
+                
+                console.log('✅ GIS data loaded');
+                addBaseLayers();
+                updateSeaLevelRise();
+                
+            } catch (error) {
+                console.error('❌ Error loading GIS data:', error);
+            }
+        }
+        
+        // Add base layers
+        function addBaseLayers() {
+            // Add parcels layer
+            if (gisData.parcels) {
+                L.geoJSON(gisData.parcels, {
+                    style: {
+                        color: '#6b7280',
+                        weight: 1,
+                        opacity: 0.3,
+                        fillOpacity: 0.1
+                    }
+                }).addTo(map);
+            }
+            
+            // Add stations layer
+            if (gisData.stations) {
+                L.geoJSON(gisData.stations, {
+                    pointToLayer: function(feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 6,
+                            fillColor: '#3b82f6',
+                            color: '#1d4ed8',
+                            weight: 2,
+                            opacity: 0.8,
+                            fillOpacity: 0.6
+                        });
+                    }
+                }).addTo(map);
+            }
+        }
+        
+        // Update sea level rise visualization
+        function updateSeaLevelRise() {
+            // Remove existing sea level rise layer
+            if (seaLevelRiseLayer) {
+                map.removeLayer(seaLevelRiseLayer);
+            }
+            
+            // Create flood zones based on sea level rise
+            const floodZones = createFloodZones(currentRiseLevel);
+            
+            if (floodZones.features.length > 0) {
+                seaLevelRiseLayer = L.geoJSON(floodZones, {
+                    style: function(feature) {
+                        const riskLevel = feature.properties.riskLevel;
+                        let color = '#3b82f6'; // Low risk - blue
+                        
+                        if (riskLevel === 'high') {
+                            color = '#ef4444'; // High risk - red
+                        } else if (riskLevel === 'medium') {
+                            color = '#f59e0b'; // Medium risk - orange
+                        }
+                        
+                        return {
+                            color: color,
+                            weight: 2,
+                            opacity: 0.8,
+                            fillOpacity: 0.6,
+                            fillColor: color
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
+                                <h4 style="margin: 0 0 0.5rem 0; color: #1e293b;">Sea Level Rise Impact</h4>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Rise Level:</strong> ${currentRiseLevel} ft</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Risk Level:</strong> ${feature.properties.riskLevel}</p>
+                                <p style="margin: 0.25rem 0; color: #64748b;"><strong>Properties Affected:</strong> ${feature.properties.propertiesAffected}</p>
+                            </div>
+                        `);
+                    }
+                });
+                
+                seaLevelRiseLayer.addTo(map);
+            }
+            
+            // Update impact analysis
+            updateImpactAnalysis();
+        }
+        
+        // Create flood zones based on sea level rise
+        function createFloodZones(riseLevel) {
+            if (!gisData.parcels) return { type: 'FeatureCollection', features: [] };
+            
+            const features = gisData.parcels.features.map(parcel => {
+                // Simulate flood risk based on elevation and sea level rise
+                const baseElevation = Math.random() * 20; // Random elevation 0-20 ft
+                const isFlooded = baseElevation <= riseLevel;
+                
+                if (isFlooded) {
+                    let riskLevel = 'low';
+                    if (riseLevel >= 5) riskLevel = 'high';
+                    else if (riseLevel >= 2) riskLevel = 'medium';
+                    
+                    return {
+                        type: 'Feature',
+                        geometry: parcel.geometry,
+                        properties: {
+                            riskLevel: riskLevel,
+                            propertiesAffected: Math.floor(Math.random() * 10) + 1,
+                            elevation: baseElevation.toFixed(1),
+                            riseLevel: riseLevel
+                        }
+                    };
+                }
+                return null;
+            }).filter(feature => feature !== null);
+            
+            return {
+                type: 'FeatureCollection',
+                features: features
+            };
+        }
+        
+        // Update impact analysis
+        function updateImpactAnalysis() {
+            const floodZones = createFloodZones(currentRiseLevel);
+            const totalProperties = gisData.parcels ? gisData.parcels.features.length : 0;
+            const affectedProperties = floodZones.features.length;
+            const affectedPopulation = Math.floor(affectedProperties * 2.5); // Estimate 2.5 people per property
+            
+            document.getElementById('properties-risk').textContent = affectedProperties;
+            document.getElementById('population-risk').textContent = affectedPopulation.toLocaleString();
+            
+            // Update risk levels
+            const infrastructureRisk = currentRiseLevel >= 5 ? 'high' : currentRiseLevel >= 2 ? 'medium' : 'low';
+            const economicRisk = Math.floor(affectedProperties * 0.5); // $0.5M per affected property
+            
+            document.getElementById('infrastructure-risk').textContent = infrastructureRisk;
+            document.getElementById('infrastructure-risk').className = `impact-value ${infrastructureRisk}`;
+            
+            document.getElementById('economic-risk').textContent = `$${economicRisk}M`;
+            document.getElementById('economic-risk').className = `impact-value ${infrastructureRisk}`;
+        }
+        
+        // Update sea level rise
+        function updateSeaLevel(value) {
+            currentRiseLevel = parseFloat(value);
+            document.getElementById('rise-value').textContent = `${currentRiseLevel} ft`;
+            updateSeaLevelRise();
+        }
+        
+        // Set scenario
+        function setScenario(name, level) {
+            // Update button states
+            document.querySelectorAll('.scenario-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.scenario-btn').classList.add('active');
+            
+            // Update slider
+            document.getElementById('rise-slider').value = level;
+            updateSeaLevel(level);
+        }
+        
+        // Toggle panel (mobile)
+        function togglePanel() {
+            document.querySelector('.left-panel').classList.toggle('open');
+        }
+        
+        // Reset view
+        function resetView() {
+            map.setView([40.7259, -73.5143], 11);
+        }
+        
+        // Export analysis
+        function exportAnalysis() {
+            console.log('Exporting sea level rise analysis...');
+        }
+        
+        // Initialize everything
+        initMap();
+        loadGISData();
+        
+        console.log('✅ Sea Level Rise Analysis initialized');
+    </script>
+</body>
+</html>
+
+

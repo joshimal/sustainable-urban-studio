@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UrbanSync - GIS Interface</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .header {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: #2563eb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .main-content {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        .sidebar {
+            width: 350px;
+            background: white;
+            border-left: 1px solid #e5e7eb;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        .layer-controls {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .layer-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .layer-item:last-child {
+            border-bottom: none;
+        }
+        .toggle {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid #d1d5db;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toggle.active {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: white;
+        }
+        .status-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .data-summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .data-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .data-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .data-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: #6b7280;
+        }
+        .error {
+            color: #dc2626;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🗺️</div>
+        <div>
+            <h1 style="margin: 0; font-size: 1.5rem; color: #1f2937;">UrbanSync</h1>
+            <p style="margin: 0; color: #6b7280; font-size: 0.875rem;">Sustainable Urban Planning</p>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="layer-controls">
+                <h3 style="margin: 0 0 1rem 0; color: #1f2937;">Map Layers</h3>
+                <div class="layer-item">
+                    <div>
+                        <div style="font-weight: 500; color: #1f2937;">Parcels</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">Property boundaries</div>
+                    </div>
+                    <div class="toggle active" id="parcels-toggle" onclick="toggleLayer('parcels')">✓</div>
+                </div>
+                <div class="layer-item">
+                    <div>
+                        <div style="font-weight: 500; color: #1f2937;">LIRR Stations</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">Transit stations</div>
+                    </div>
+                    <div class="toggle active" id="stations-toggle" onclick="toggleLayer('stations')">✓</div>
+                </div>
+                <div class="layer-item">
+                    <div>
+                        <div style="font-weight: 500; color: #1f2937;">Flood Zones</div>
+                        <div style="font-size: 0.875rem; color: #6b7280;">FEMA flood areas</div>
+                    </div>
+                    <div class="toggle active" id="flood-toggle" onclick="toggleLayer('flood')">✓</div>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3 style="margin: 0 0 1rem 0; color: #1f2937;">Data Status</h3>
+                <div id="data-status">Loading GIS data...</div>
+            </div>
+
+            <div class="data-summary">
+                <div class="data-item">
+                    <div class="data-number" id="parcels-count">-</div>
+                    <div class="data-label">Parcels</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-number" id="stations-count">-</div>
+                    <div class="data-label">Stations</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-number" id="flood-count">-</div>
+                    <div class="data-label">Flood Zones</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-number" id="total-count">-</div>
+                    <div class="data-label">Total Features</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🗺️ Starting UrbanSync GIS Interface...');
+        
+        let map;
+        let gisData = {
+            parcels: null,
+            stations: null,
+            flood: null
+        };
+        let layers = {
+            parcels: null,
+            stations: null,
+            flood: null
+        };
+        let layerVisibility = {
+            parcels: true,
+            stations: true,
+            flood: true
+        };
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([40.7259, -73.5143], 10);
+            
+            // Add base layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            console.log('✅ Map initialized');
+        }
+
+        // Load GIS data
+        async function loadGISData() {
+            try {
+                console.log('🔄 Loading GIS data...');
+                document.getElementById('data-status').innerHTML = '<div class="loading">Loading GIS data...</div>';
+                
+                const [parcelsRes, stationsRes, floodRes] = await Promise.all([
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=parcels'),
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=stations'),
+                    fetch('http://localhost:3001/api/qgis/nassau/get-data?type=flood_zones')
+                ]);
+                
+                const parcels = await parcelsRes.json();
+                const stations = await stationsRes.json();
+                const flood = await floodRes.json();
+                
+                gisData.parcels = parcels.data;
+                gisData.stations = stations.data;
+                gisData.flood = flood.data;
+                
+                console.log('✅ GIS data loaded:', {
+                    parcels: gisData.parcels.features.length,
+                    stations: gisData.stations.features.length,
+                    flood: gisData.flood.features.length
+                });
+                
+                // Update data counts
+                document.getElementById('parcels-count').textContent = gisData.parcels.features.length;
+                document.getElementById('stations-count').textContent = gisData.stations.features.length;
+                document.getElementById('flood-count').textContent = gisData.flood.features.length;
+                document.getElementById('total-count').textContent = 
+                    gisData.parcels.features.length + 
+                    gisData.stations.features.length + 
+                    gisData.flood.features.length;
+                
+                document.getElementById('data-status').innerHTML = '<div style="color: #059669;">✅ Data loaded successfully</div>';
+                
+                // Add layers to map
+                addLayersToMap();
+                
+            } catch (error) {
+                console.error('❌ Error loading GIS data:', error);
+                document.getElementById('data-status').innerHTML = 
+                    `<div class="error">❌ Error loading data: ${error.message}</div>`;
+            }
+        }
+
+        // Add layers to map
+        function addLayersToMap() {
+            // Add parcels layer
+            if (gisData.parcels) {
+                layers.parcels = L.geoJSON(gisData.parcels, {
+                    style: function(feature) {
+                        const zoning = feature.properties.zoning;
+                        let color = '#6b7280'; // default gray
+                        
+                        if (zoning === 'R-1') color = '#22c55e'; // green
+                        else if (zoning === 'R-2') color = '#fbbf24'; // yellow
+                        else if (zoning === 'C-1') color = '#ef4444'; // red
+                        
+                        return {
+                            color: color,
+                            weight: 1,
+                            opacity: 0.8,
+                            fillOpacity: 0.6
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <strong>Parcel ${feature.properties.id}</strong><br>
+                            Address: ${feature.properties.address}<br>
+                            Zoning: ${feature.properties.zoning}<br>
+                            Area: ${feature.properties.area} sq ft
+                        `);
+                    }
+                });
+                
+                if (layerVisibility.parcels) {
+                    layers.parcels.addTo(map);
+                }
+            }
+            
+            // Add stations layer
+            if (gisData.stations) {
+                layers.stations = L.geoJSON(gisData.stations, {
+                    pointToLayer: function(feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 8,
+                            fillColor: '#2563eb',
+                            color: '#1d4ed8',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <strong>${feature.properties.name}</strong><br>
+                            Type: ${feature.properties.type || 'LIRR Station'}<br>
+                            Lines: ${feature.properties.lines || 'Multiple'}
+                        `);
+                    }
+                });
+                
+                if (layerVisibility.stations) {
+                    layers.stations.addTo(map);
+                }
+            }
+            
+            // Add flood zones layer
+            if (gisData.flood) {
+                layers.flood = L.geoJSON(gisData.flood, {
+                    style: function(feature) {
+                        const zone = feature.properties.zone;
+                        let color = '#6b7280'; // default gray
+                        
+                        if (zone === 'AE') color = '#3b82f6'; // blue
+                        else if (zone === 'VE') color = '#dc2626'; // red
+                        
+                        return {
+                            color: color,
+                            weight: 2,
+                            opacity: 0.8,
+                            fillOpacity: 0.4
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindPopup(`
+                            <strong>Flood Zone ${feature.properties.zone}</strong><br>
+                            Risk Level: ${feature.properties.risk || 'Moderate'}<br>
+                            Base Flood Elevation: ${feature.properties.bfe || 'N/A'}
+                        `);
+                    }
+                });
+                
+                if (layerVisibility.flood) {
+                    layers.flood.addTo(map);
+                }
+            }
+            
+            console.log('✅ Layers added to map');
+        }
+
+        // Toggle layer visibility
+        function toggleLayer(layerName) {
+            layerVisibility[layerName] = !layerVisibility[layerName];
+            const toggle = document.getElementById(layerName + '-toggle');
+            
+            if (layerVisibility[layerName]) {
+                toggle.classList.add('active');
+                toggle.textContent = '✓';
+                if (layers[layerName]) {
+                    layers[layerName].addTo(map);
+                }
+            } else {
+                toggle.classList.remove('active');
+                toggle.textContent = '';
+                if (layers[layerName]) {
+                    map.removeLayer(layers[layerName]);
+                }
+            }
+        }
+
+        // Initialize everything
+        initMap();
+        loadGISData();
+        
+        console.log('✅ UrbanSync GIS Interface initialized');
+    </script>
+</body>
+</html>
+
+

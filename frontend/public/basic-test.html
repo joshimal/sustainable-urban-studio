@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Basic JavaScript Test</title>
+    <style>
+        body {
+            margin: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .test-box {
+            width: 100%;
+            height: 300px;
+            border: 3px solid blue;
+            background-color: lightblue;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .status {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Basic JavaScript Test</h1>
+    
+    <div class="status">
+        <p><strong>JavaScript Status:</strong> <span id="js-status">Testing...</span></p>
+        <p><strong>Mapbox CDN Status:</strong> <span id="mapbox-status">Testing...</span></p>
+    </div>
+    
+    <div class="test-box" id="test-box">
+        Loading...
+    </div>
+    
+    <div class="status">
+        <p>If you see "JavaScript Working!" above, JavaScript is functioning.</p>
+        <p>If you see "Mapbox Loaded!" below, the Mapbox CDN is accessible.</p>
+    </div>
+
+    <script>
+        console.log('🚀 Starting basic JavaScript test...');
+        
+        // Test basic JavaScript
+        document.getElementById('js-status').textContent = '✅ JavaScript Working!';
+        document.getElementById('test-box').textContent = 'JavaScript Working!';
+        
+        console.log('✅ Basic JavaScript working');
+        
+        // Test Mapbox CDN loading
+        const script = document.createElement('script');
+        script.src = 'https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js';
+        script.onload = function() {
+            console.log('✅ Mapbox script loaded');
+            document.getElementById('mapbox-status').textContent = '✅ Mapbox CDN Accessible!';
+            
+            // Test if mapboxgl is available
+            if (typeof mapboxgl !== 'undefined') {
+                console.log('✅ mapboxgl object available');
+                document.getElementById('test-box').textContent = 'JavaScript + Mapbox Working!';
+            } else {
+                console.log('❌ mapboxgl object not available');
+                document.getElementById('test-box').textContent = 'JavaScript Working, Mapbox Issue';
+            }
+        };
+        script.onerror = function() {
+            console.error('❌ Mapbox script failed to load');
+            document.getElementById('mapbox-status').textContent = '❌ Mapbox CDN Not Accessible';
+            document.getElementById('test-box').textContent = 'JavaScript Working, Mapbox CDN Failed';
+        };
+        document.head.appendChild(script);
+        
+        // Also test CSS loading
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css';
+        link.onload = function() {
+            console.log('✅ Mapbox CSS loaded');
+        };
+        link.onerror = function() {
+            console.error('❌ Mapbox CSS failed to load');
+        };
+        document.head.appendChild(link);
+        
+    </script>
+</body>
+</html>
+
+

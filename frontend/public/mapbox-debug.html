@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mapbox Debug</title>
+    <style>
+        body { margin: 20px; font-family: Arial, sans-serif; }
+        .status { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        #map { width: 100%; height: 400px; border: 2px solid red; background: yellow; }
+    </style>
+</head>
+<body>
+    <h1>Mapbox Debug Test</h1>
+    
+    <div class="status">
+        <p><strong>Step 1 - JavaScript:</strong> <span id="js-status">Testing...</span></p>
+        <p><strong>Step 2 - Mapbox Script:</strong> <span id="script-status">Testing...</span></p>
+        <p><strong>Step 3 - Mapbox Object:</strong> <span id="object-status">Testing...</span></p>
+        <p><strong>Step 4 - Map Creation:</strong> <span id="map-status">Testing...</span></p>
+    </div>
+    
+    <div id="map">Map will appear here...</div>
+    
+    <div id="console-output"></div>
+
+    <script>
+        console.log('🔍 Starting Mapbox debug test...');
+        
+        // Step 1: Test JavaScript
+        document.getElementById('js-status').textContent = '✅ Working';
+        document.getElementById('js-status').className = 'status success';
+        console.log('✅ JavaScript working');
+        
+        // Step 2: Load Mapbox script
+        const script = document.createElement('script');
+        script.src = 'https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js';
+        
+        script.onload = function() {
+            console.log('✅ Mapbox script loaded');
+            document.getElementById('script-status').textContent = '✅ Loaded';
+            document.getElementById('script-status').className = 'status success';
+            
+            // Step 3: Check if mapboxgl object exists
+            if (typeof mapboxgl !== 'undefined') {
+                console.log('✅ mapboxgl object available');
+                document.getElementById('object-status').textContent = '✅ Available';
+                document.getElementById('object-status').className = 'status success';
+                
+                // Step 4: Try to create map
+                try {
+                    mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+                    console.log('✅ Access token set');
+                    
+                    const map = new mapboxgl.Map({
+                        container: 'map',
+                        style: 'mapbox://styles/mapbox/streets-v12',
+                        center: [-73.5143, 40.7259],
+                        zoom: 10
+                    });
+                    
+                    console.log('✅ Map instance created');
+                    document.getElementById('map-status').textContent = '✅ Created';
+                    document.getElementById('map-status').className = 'status success';
+                    
+                    map.on('load', function() {
+                        console.log('✅ Map loaded successfully');
+                        document.getElementById('map').innerHTML = 'Map loaded successfully!';
+                        document.getElementById('map').style.background = 'lightgreen';
+                    });
+                    
+                    map.on('error', function(e) {
+                        console.error('❌ Map error:', e);
+                        document.getElementById('map').innerHTML = 'Map error: ' + (e.error ? e.error.message : 'Unknown');
+                        document.getElementById('map').style.background = 'lightcoral';
+                    });
+                    
+                } catch (error) {
+                    console.error('❌ Map creation error:', error);
+                    document.getElementById('map-status').textContent = '❌ Error: ' + error.message;
+                    document.getElementById('map-status').className = 'status error';
+                }
+                
+            } else {
+                console.log('❌ mapboxgl object not available');
+                document.getElementById('object-status').textContent = '❌ Not Available';
+                document.getElementById('object-status').className = 'status error';
+            }
+        };
+        
+        script.onerror = function() {
+            console.error('❌ Mapbox script failed to load');
+            document.getElementById('script-status').textContent = '❌ Failed to Load';
+            document.getElementById('script-status').className = 'status error';
+        };
+        
+        document.head.appendChild(script);
+        
+        // Also load CSS
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css';
+        document.head.appendChild(link);
+        
+    </script>
+</body>
+</html>
+
+

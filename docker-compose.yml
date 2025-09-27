@@ -1,76 +1,86 @@
 services:
-  # PostgreSQL with PostGIS for spatial data
-  database:
-    image: postgis/postgis:15-3.3
+  # Database service with PostGIS support
+  urban-studio-db:
+    image: postgis/postgis:15-3.4
     container_name: urban-studio-db
     environment:
-      POSTGRES_DB: urban_studio
-      POSTGRES_USER: urban_dev
-      POSTGRES_PASSWORD: dev_password_2024
+      - POSTGRES_DB=urban_studio
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=your_password_here
+      - POSTGRES_HOST_AUTH_METHOD=md5
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
-      - urban-network
+      - urban-studio-network
+    restart: unless-stopped
 
-  # Backend API
-  backend:
+  # Backend service
+  urban-studio-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
     container_name: urban-studio-backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:your_password_here@urban-studio-db:5432/urban_studio
+      - NODE_ENV=development
     ports:
       - "3001:3001"
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./data:/app/uploads
-    environment:
-      - NODE_ENV=development
     depends_on:
-      - database
+      - urban-studio-db
     networks:
-      - urban-network
+      - urban-studio-network
+    restart: unless-stopped
 
-  # QGIS Processing Server
-  qgis-server:
-    build:
-      context: ./qgis-processing
-      dockerfile: Dockerfile
-    container_name: urban-studio-qgis
-    environment:
-      - QGIS_SERVER_LOG_LEVEL=2
-    ports:
-      - "8081:5000"
-    volumes:
-      - ./data:/data
-      - ./qgis-processing:/app
-    depends_on:
-      - database
-    networks:
-      - urban-network
-
-  # React development server
-  frontend:
+  # Frontend service
+  urban-studio-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     container_name: urban-studio-frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001
     ports:
-      - "8080:5173"
+      - "8080:8080"
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - VITE_QGIS_SERVER_URL=http://localhost:8081
+    depends_on:
+      - urban-studio-backend
     networks:
-      - urban-network
+      - urban-studio-network
+    restart: unless-stopped
+
+  # QGIS service - ARM64 compatible alternative
+  urban-studio-qgis:
+    build:
+      context: ./qgis-processing
+      dockerfile: Dockerfile
+    container_name: urban-studio-qgis
+    platform: linux/arm64
+    environment:
+      - DISPLAY=:1
+      - QT_X11_NO_MITSHM=1
+    ports:
+      - "8081:5000"
+    volumes:
+      - ./qgis-data:/data
+      - ./qgis-projects:/projects
+    depends_on:
+      - urban-studio-db
+    networks:
+      - urban-studio-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
-  urban-network:
+  urban-studio-network:
     driver: bridge

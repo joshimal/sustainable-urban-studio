@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Map Test</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.8.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #map {
+            width: 100%;
+            height: 500px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .mapboxgl-map {
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">🗺️ Simple Map Test</h1>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Mapbox Integration Test</h2>
+            <div id="map"></div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Debug Info</h2>
+            <div id="debug-info" class="text-sm text-gray-600">
+                <p>Loading map...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Debug function
+        function updateDebugInfo(message) {
+            document.getElementById('debug-info').innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + message + '</p>';
+        }
+
+        updateDebugInfo('Starting map initialization...');
+
+        // Check if Mapbox is loaded
+        if (typeof mapboxgl === 'undefined') {
+            updateDebugInfo('❌ ERROR: Mapbox GL JS not loaded');
+        } else {
+            updateDebugInfo('✅ Mapbox GL JS loaded successfully');
+        }
+
+        // Set access token
+        mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+        updateDebugInfo('✅ Access token set');
+
+        // Initialize map
+        try {
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [-73.5143, 40.7259],
+                zoom: 10
+            });
+
+            updateDebugInfo('✅ Map instance created');
+
+            map.on('load', function() {
+                updateDebugInfo('✅ Map loaded successfully');
+                
+                // Add a simple marker
+                new mapboxgl.Marker()
+                    .setLngLat([-73.5143, 40.7259])
+                    .addTo(map);
+                
+                updateDebugInfo('✅ Marker added');
+            });
+
+            map.on('error', function(e) {
+                updateDebugInfo('❌ Map error: ' + e.error.message);
+            });
+
+        } catch (error) {
+            updateDebugInfo('❌ Error creating map: ' + error.message);
+        }
+    </script>
+</body>
+</html>
+
+
