@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
-import { ArrowLeft, Layers, Search, ZoomIn, ZoomOut, Maximize2, Map } from "lucide-react"
+import { ArrowLeft, Layers, Search, ZoomIn, ZoomOut, Maximize2, Map, BarChart3 } from "lucide-react"
 import { LayerPanel } from "./layer-panel"
 import { VisualizationPanel } from "./visualization-panel"
 import { MapView } from "./map-view"
@@ -158,8 +158,8 @@ export function GISAnalysisApp() {
             </Button>
           </div>
 
-          {/* Layer Panel Toggle */}
-          <div className="absolute top-4 left-4">
+          {/* Control Buttons */}
+          <div className="absolute top-4 left-4 flex gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -168,6 +168,15 @@ export function GISAnalysisApp() {
             >
               <Layers className="h-4 w-4" />
               Layers
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setVizPanelOpen(!vizPanelOpen)}
+              className="flex items-center gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Charts
             </Button>
           </div>
 

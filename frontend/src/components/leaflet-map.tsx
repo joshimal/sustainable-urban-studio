@@ -20,7 +20,12 @@ export function LeafletMap({ className, climateData }: LeafletMapProps) {
   const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
-    if (isInitialized || !mapContainerRef.current) return
+    console.log("useEffect running - isInitialized:", isInitialized, "mapContainerRef.current:", !!mapContainerRef.current)
+
+    if (isInitialized || !mapContainerRef.current) {
+      console.log("Skipping map init - already initialized or no container")
+      return
+    }
 
     const initMap = async () => {
       try {

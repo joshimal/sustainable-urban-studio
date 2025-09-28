@@ -4,6 +4,7 @@ import { Slider } from "./ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Separator } from "./ui/separator"
+import { Switch } from "./ui/switch"
 import { useState } from "react"
 import { X, MoreHorizontal, Plus } from "lucide-react"
 
@@ -19,6 +20,30 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
   const [temperatureThreshold, setTemperatureThreshold] = useState([3.2])
   const [seaLevelRange, setSeaLevelRange] = useState([2.5])
   const [borderWidth, setBorderWidth] = useState([1])
+
+  // Climate layer toggles
+  const [activeLayers, setActiveLayers] = useState({
+    temperatureTrends: true,
+    seaLevelRise: false,
+    airQuality: false,
+    climateSummary: false,
+    riskAssessment: false
+  })
+
+  const climateLayerTypes = [
+    { key: "temperatureTrends", name: "Temperature Trends", icon: "🌡️" },
+    { key: "seaLevelRise", name: "Sea Level Rise", icon: "🌊" },
+    { key: "airQuality", name: "Air Quality Index", icon: "💨" },
+    { key: "climateSummary", name: "Climate Summary", icon: "📈" },
+    { key: "riskAssessment", name: "Risk Assessment", icon: "⚠️" },
+  ]
+
+  const toggleLayer = (layerKey: string) => {
+    setActiveLayers(prev => ({
+      ...prev,
+      [layerKey]: !prev[layerKey as keyof typeof prev]
+    }))
+  }
 
   const getLayerConfig = () => {
     switch (selectedLayer) {
@@ -64,7 +89,7 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
       {/* Header */}
       <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="font-semibold">Climate Controls</h2>
+          <h2 className="font-semibold">Layer Controls</h2>
           <Button variant="ghost" size="sm" onClick={onClose} className="p-1">
             <X className="h-4 w-4" />
           </Button>
@@ -75,6 +100,25 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
           <Button variant="ghost" size="sm" className="p-1">
             <MoreHorizontal className="h-4 w-4" />
           </Button>
+        </div>
+      </div>
+
+      {/* Climate Layer Toggles */}
+      <div className="p-4 border-b border-gray-700">
+        <h3 className="text-sm font-medium mb-3">Climate Layers</h3>
+        <div className="space-y-3">
+          {climateLayerTypes.map((layer) => (
+            <div key={layer.key} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{layer.icon}</span>
+                <span className="text-sm text-muted-foreground">{layer.name}</span>
+              </div>
+              <Switch
+                checked={activeLayers[layer.key as keyof typeof activeLayers]}
+                onCheckedChange={() => toggleLayer(layer.key)}
+              />
+            </div>
+          ))}
         </div>
       </div>
 
