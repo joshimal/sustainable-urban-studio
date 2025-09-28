@@ -4,7 +4,6 @@ import { Slider } from "./ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Separator } from "./ui/separator"
-import { Switch } from "./ui/switch"
 import { useState } from "react"
 import { X, MoreHorizontal, Plus } from "lucide-react"
 
@@ -21,29 +20,6 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
   const [seaLevelRange, setSeaLevelRange] = useState([2.5])
   const [borderWidth, setBorderWidth] = useState([1])
 
-  // Climate layer toggles
-  const [activeLayers, setActiveLayers] = useState({
-    temperatureTrends: true,
-    seaLevelRise: false,
-    airQuality: false,
-    climateSummary: false,
-    riskAssessment: false
-  })
-
-  const climateLayerTypes = [
-    { key: "temperatureTrends", name: "Temperature Trends", icon: "🌡️" },
-    { key: "seaLevelRise", name: "Sea Level Rise", icon: "🌊" },
-    { key: "airQuality", name: "Air Quality Index", icon: "💨" },
-    { key: "climateSummary", name: "Climate Summary", icon: "📈" },
-    { key: "riskAssessment", name: "Risk Assessment", icon: "⚠️" },
-  ]
-
-  const toggleLayer = (layerKey: string) => {
-    setActiveLayers(prev => ({
-      ...prev,
-      [layerKey]: !prev[layerKey as keyof typeof prev]
-    }))
-  }
 
   const getLayerConfig = () => {
     switch (selectedLayer) {
@@ -103,29 +79,11 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
         </div>
       </div>
 
-      {/* Climate Layer Toggles */}
-      <div className="p-4 border-b border-gray-700">
-        <h3 className="text-sm font-medium mb-3">Climate Layers</h3>
-        <div className="space-y-3">
-          {climateLayerTypes.map((layer) => (
-            <div key={layer.key} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm">{layer.icon}</span>
-                <span className="text-sm text-muted-foreground">{layer.name}</span>
-              </div>
-              <Switch
-                checked={activeLayers[layer.key as keyof typeof activeLayers]}
-                onCheckedChange={() => toggleLayer(layer.key)}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Layer Tabs */}
       <div className="flex-1 overflow-y-auto">
         <Tabs defaultValue="style" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mx-4 mt-4">
+          <TabsList className="grid w-full grid-cols-3 mx-4 mt-4">
             <TabsTrigger value="general" className="text-xs">
               General
             </TabsTrigger>
@@ -134,12 +92,6 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
             </TabsTrigger>
             <TabsTrigger value="style" className="text-xs">
               Style
-            </TabsTrigger>
-            <TabsTrigger value="hover" className="text-xs">
-              Hover
-            </TabsTrigger>
-            <TabsTrigger value="click" className="text-xs">
-              Click
             </TabsTrigger>
           </TabsList>
 
@@ -309,13 +261,6 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
             </div>
           </TabsContent>
 
-          <TabsContent value="hover" className="p-4">
-            <div className="text-sm text-muted-foreground">Hover interaction settings</div>
-          </TabsContent>
-
-          <TabsContent value="click" className="p-4">
-            <div className="text-sm text-muted-foreground">Click interaction settings</div>
-          </TabsContent>
         </Tabs>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MapPin, Info } from "lucide-react"
@@ -13,66 +13,87 @@ interface LeafletMapProps {
 export function LeafletMap({ className, climateData }: LeafletMapProps) {
   console.log("LeafletMap component rendering...")
 
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [mapError, setMapError] = useState<string | null>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const initAttempted = useRef(false)
 
   useEffect(() => {
-    console.log("useEffect running - isInitialized:", isInitialized, "mapContainerRef.current:", !!mapContainerRef.current)
+    console.log("useEffect running, container available:", !!mapContainerRef.current)
 
-    if (isInitialized || !mapContainerRef.current) {
-      console.log("Skipping map init - already initialized or no container")
-      return
+    // Reset attempt flag on every effect run (handles React Strict Mode remounts)
+    initAttempted.current = false
+
+    const attemptInit = () => {
+      if (initAttempted.current || !mapContainerRef.current) {
+        console.log("Skipping init - already attempted or no container")
+        return
+      }
+
+      initAttempted.current = true
+
+      const initializeMap = async () => {
+        try {
+          console.log("Starting map initialization...")
+
+          // Dynamic import of Leaflet
+          const L = (await import("leaflet")).default
+          console.log("Leaflet imported successfully")
+
+          // Initialize map
+          const map = L.map(mapContainerRef.current!, {
+            center: [40.7589, -73.9851], // Nassau County coordinates
+            zoom: 10,
+            zoomControl: true,
+            attributionControl: false,
+          })
+          console.log("Map created successfully")
+
+          // Add dark minimal tile layer
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
+            attribution: "© CartoDB",
+            subdomains: "abcd",
+            maxZoom: 19,
+          }).addTo(map)
+          console.log("Tiles added successfully")
+
+          // Store map instance
+          mapInstanceRef.current = map
+          setIsLoading(false)
+          console.log("Map initialization complete!")
+
+        } catch (error) {
+          console.error("Leaflet map initialization error:", error)
+          setMapError(error instanceof Error ? error.message : "Failed to initialize map")
+          setIsLoading(false)
+          initAttempted.current = false // Allow retry on error
+        }
+      }
+
+      initializeMap()
     }
 
-    const initMap = async () => {
-      try {
-        console.log("Starting map initialization...")
+    // Try immediately, then with increasing delays if container not ready
+    attemptInit()
 
-        // Dynamic import of Leaflet
-        const L = (await import("leaflet")).default
-        console.log("Leaflet imported successfully")
+    if (!mapContainerRef.current) {
+      const timer1 = setTimeout(attemptInit, 50)
+      const timer2 = setTimeout(attemptInit, 200)
+      const timer3 = setTimeout(attemptInit, 500)
 
-        // Initialize map
-        const map = L.map(mapContainerRef.current!, {
-          center: [40.7589, -73.9851], // Nassau County coordinates
-          zoom: 10,
-          zoomControl: true,
-          attributionControl: false,
-        })
-        console.log("Map created successfully")
-
-        // Add dark minimal tile layer
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
-          attribution: "© CartoDB",
-          subdomains: "abcd",
-          maxZoom: 19,
-        }).addTo(map)
-        console.log("Tiles added successfully")
-
-        // Store map instance
-        mapInstanceRef.current = map
-        setIsInitialized(true)
-        setIsLoading(false)
-        console.log("Map initialization complete!")
-
-      } catch (error) {
-        console.error("Leaflet map initialization error:", error)
-        setMapError(error instanceof Error ? error.message : "Failed to initialize map")
-        setIsLoading(false)
+      return () => {
+        clearTimeout(timer1)
+        clearTimeout(timer2)
+        clearTimeout(timer3)
       }
     }
-
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(initMap, 200)
-    return () => clearTimeout(timer)
-  }, [isInitialized])
+  }, [])
 
   useEffect(() => {
     return () => {
       if (mapInstanceRef.current) {
+        console.log("Cleaning up map instance")
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
       }
