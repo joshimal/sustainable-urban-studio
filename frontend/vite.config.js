@@ -14,6 +14,9 @@ export default defineConfig({
     port: 8080
   },
   css: {
-    postcss: './postcss.config.js'
+    postcss: './postcss.config.cjs'
+  },
+  optimizeDeps: {
+    exclude: ['leaflet']
   }
 })

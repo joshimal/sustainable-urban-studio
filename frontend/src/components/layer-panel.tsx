@@ -9,7 +9,7 @@ import { X, MoreHorizontal, Plus } from "lucide-react"
 
 interface LayerPanelProps {
   selectedLayer: string
-  onClose: () => void
+  onClose?: () => void
   climateData?: any
 }
 
@@ -66,9 +66,11 @@ export function LayerPanel({ selectedLayer, onClose, climateData }: LayerPanelPr
       <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between mb-2">
           <h2 className="font-semibold">Layer Controls</h2>
-          <Button variant="ghost" size="sm" onClick={onClose} className="p-1">
-            <X className="h-4 w-4" />
-          </Button>
+          {onClose && (
+            <Button variant="ghost" size="sm" onClick={onClose} className="p-1">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

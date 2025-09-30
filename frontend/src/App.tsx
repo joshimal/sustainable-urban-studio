@@ -1,5 +1,4 @@
-import React from 'react'
-import { GISAnalysisApp } from './components/GISAnalysisApp'
+import { GISAnalysisApp } from './components/gis-analysis-app'
 
 export default function App() {
   return <GISAnalysisApp />

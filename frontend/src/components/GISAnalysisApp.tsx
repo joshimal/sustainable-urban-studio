@@ -18,11 +18,11 @@ export function GISAnalysisApp() {
 
   // Climate data state - integrating with your existing APIs
   const [climateData, setClimateData] = useState({
-    temperature: { value: 3.2, loading: true },
-    seaLevel: { value: 2.5, loading: true },
-    airQuality: { value: 85, loading: true },
-    precipitation: { value: 85, loading: true },
-    greenSpace: { value: 35, loading: true },
+    temperature: { value: 3.2, loading: true, timeSeries: null, data: null },
+    seaLevel: { value: 2.5, loading: true, projections: null, summary: null },
+    airQuality: { value: 85, loading: true, timeSeries: null, data: null },
+    precipitation: { value: 85, loading: true, timeSeries: null },
+    greenSpace: { value: 35, loading: true, timeSeries: null, benefits: null },
     loading: false,
     error: null
   });

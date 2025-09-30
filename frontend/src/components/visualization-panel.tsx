@@ -4,7 +4,7 @@ import { X } from "lucide-react"
 import { useState } from "react"
 
 interface VisualizationPanelProps {
-  onClose: () => void
+  onClose?: () => void
   climateData?: any
 }
 
@@ -36,9 +36,11 @@ export function VisualizationPanel({ onClose, climateData }: VisualizationPanelP
     <div className="w-64 bg-card border-l border-gray-700 p-4">
       <div className="flex items-center justify-between mb-6">
         <h3 className="font-semibold text-sm">Climate Charts</h3>
-        <Button variant="ghost" size="sm" onClick={onClose} className="p-1">
-          <X className="h-4 w-4" />
-        </Button>
+        {onClose && (
+          <Button variant="ghost" size="sm" onClick={onClose} className="p-1">
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="space-y-4">

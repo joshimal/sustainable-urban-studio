@@ -1,156 +1,146 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { MapPin, Info } from "lucide-react"
+import { map, tileLayer, marker } from "leaflet"
 
 interface LeafletMapProps {
   className?: string
   climateData?: any
 }
 
-export function LeafletMap({ className, climateData }: LeafletMapProps) {
-  console.log("LeafletMap component rendering...")
-
+export function LeafletMap({ className }: LeafletMapProps) {
+  console.log('LeafletMap component rendering...')
   const [isLoading, setIsLoading] = useState(true)
-  const [mapError, setMapError] = useState<string | null>(null)
-  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
   const mapInstanceRef = useRef<any>(null)
-  const initAttempted = useRef(false)
+  const mapRef = useRef<HTMLDivElement>(null)
 
+  // Track when component is mounted and ref is ready
   useEffect(() => {
-    console.log("useEffect running, container available:", !!mapContainerRef.current)
-
-    // Reset attempt flag on every effect run (handles React Strict Mode remounts)
-    initAttempted.current = false
-
-    const attemptInit = () => {
-      if (initAttempted.current || !mapContainerRef.current) {
-        console.log("Skipping init - already attempted or no container")
-        return
-      }
-
-      initAttempted.current = true
-
-      const initializeMap = async () => {
-        try {
-          console.log("Starting map initialization...")
-
-          // Dynamic import of Leaflet
-          const L = (await import("leaflet")).default
-          console.log("Leaflet imported successfully")
-
-          // Initialize map
-          const map = L.map(mapContainerRef.current!, {
-            center: [40.7589, -73.9851], // Nassau County coordinates
-            zoom: 10,
-            zoomControl: true,
-            attributionControl: false,
-          })
-          console.log("Map created successfully")
-
-          // Add dark minimal tile layer
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
-            attribution: "© CartoDB",
-            subdomains: "abcd",
-            maxZoom: 19,
-          }).addTo(map)
-          console.log("Tiles added successfully")
-
-          // Store map instance
-          mapInstanceRef.current = map
-          setIsLoading(false)
-          console.log("Map initialization complete!")
-
-        } catch (error) {
-          console.error("Leaflet map initialization error:", error)
-          setMapError(error instanceof Error ? error.message : "Failed to initialize map")
-          setIsLoading(false)
-          initAttempted.current = false // Allow retry on error
-        }
-      }
-
-      initializeMap()
-    }
-
-    // Try immediately, then with increasing delays if container not ready
-    attemptInit()
-
-    if (!mapContainerRef.current) {
-      const timer1 = setTimeout(attemptInit, 50)
-      const timer2 = setTimeout(attemptInit, 200)
-      const timer3 = setTimeout(attemptInit, 500)
-
-      return () => {
-        clearTimeout(timer1)
-        clearTimeout(timer2)
-        clearTimeout(timer3)
-      }
-    }
+    console.log('Component mounted, setting isMounted to true')
+    setIsMounted(true)
   }, [])
 
   useEffect(() => {
+    if (!isMounted) {
+      console.log('Component not mounted yet, skipping map init')
+      return
+    }
+
+    console.log('LeafletMap useEffect running, isMounted:', isMounted)
+
+    let isComponentMounted = true
+    let timeoutId: NodeJS.Timeout
+
+    const initMap = async () => {
+      try {
+        console.log('Starting map initialization...')
+        console.log('Using static Leaflet imports')
+
+        // Wait for container to be available
+        let attempts = 0
+        const maxAttempts = 50
+        
+        while (!mapRef.current && attempts < maxAttempts) {
+          console.log(`Waiting for container, attempt ${attempts + 1}/${maxAttempts}, mapRef.current:`, mapRef.current)
+          await new Promise(resolve => setTimeout(resolve, 50))
+          attempts++
+        }
+
+        if (!mapRef.current) {
+          console.error('Map container not found after waiting')
+          if (isComponentMounted) {
+            setError("Map container not found after waiting")
+          }
+          return
+        }
+
+        console.log('Container found, creating map...')
+        // Create map using static imports
+        const leafletMap = map(mapRef.current, {
+          center: [40.7589, -73.9851], // Nassau County
+          zoom: 10,
+          zoomControl: true,
+          attributionControl: true
+        })
+
+        console.log('Map created, adding tile layer...')
+        // Add tile layer
+        tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+          attribution: '© CartoDB',
+          subdomains: 'abcd',
+          maxZoom: 19
+        }).addTo(leafletMap)
+
+        console.log('Adding marker...')
+        // Add a simple marker to test
+        marker([40.7589, -73.9851]).addTo(leafletMap)
+          .bindPopup('Nassau County, NY')
+
+        console.log('Map initialization complete!')
+        if (isComponentMounted) {
+          mapInstanceRef.current = leafletMap
+          setIsLoading(false)
+        }
+
+      } catch (err) {
+        console.error('Map initialization error:', err)
+        if (isComponentMounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load map')
+        setIsLoading(false)
+        }
+      }
+    }
+
+    // Set a timeout to prevent infinite loading
+    timeoutId = setTimeout(() => {
+      if (isComponentMounted && isLoading) {
+        console.error('Map initialization timeout')
+        setError("Map initialization timeout")
+        setIsLoading(false)
+      }
+    }, 5000) // 5 second timeout
+
+    // Start initialization immediately
+    initMap()
+
     return () => {
+      isComponentMounted = false
+      clearTimeout(timeoutId)
       if (mapInstanceRef.current) {
-        console.log("Cleaning up map instance")
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
       }
     }
-  }, [])
+  }, [isMounted])
 
-  if (isLoading) {
-    return (
-      <div className={`h-full bg-slate-900 relative overflow-hidden flex items-center justify-center ${className}`}>
-        <Card className="p-6 bg-card/90 backdrop-blur-sm text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-sm text-muted-foreground">Loading dark minimal map...</p>
-        </Card>
-      </div>
-    )
-  }
-
-  if (mapError) {
-    return (
-      <div className={`h-full bg-slate-900 relative overflow-hidden flex items-center justify-center p-4 ${className}`}>
-        <Card className="p-6 bg-card/90 backdrop-blur-sm max-w-lg">
-          <Alert className="mb-4">
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Map Error:</strong> {mapError}
-            </AlertDescription>
-          </Alert>
-          <div className="text-sm text-muted-foreground">
-            <p>The Leaflet map failed to initialize.</p>
-            <p className="mt-2">Check the console for details.</p>
-          </div>
-        </Card>
-      </div>
-    )
-  }
+  console.log('LeafletMap rendering return statement, mapRef.current:', mapRef.current)
 
   return (
-    <div className={`h-full relative ${className}`}>
+    <div className={`relative h-full ${className}`}>
       <div
-        ref={mapContainerRef}
-        className="h-full w-full"
-        style={{ minHeight: "400px" }}
+        ref={mapRef}
+        className="absolute inset-0"
+        style={{ backgroundColor: '#1a1a1a' }}
       />
 
-      {/* Climate data overlay */}
-      {climateData && (
-        <Card className="absolute bottom-4 left-4 p-3 bg-card/90 backdrop-blur-sm border border-gray-700">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            <span className="text-sm font-semibold">Nassau Climate Data</span>
+      {isLoading && (
+        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Loading map...</p>
           </div>
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <div>🌡️ Temperature: +{climateData.temperature?.value?.toFixed(1) || "3.2"}°C</div>
-            <div>🌊 Sea Level: +{climateData.seaLevel?.value || "2.5"}cm</div>
-            <div>💨 AQI: {climateData.airQuality?.value || "85"}</div>
           </div>
-        </Card>
+      )}
+
+      {error && (
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="text-white text-center bg-red-900/70 px-4 py-3 rounded">
+            <p className="text-red-300 mb-2">Map Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
       )}
     </div>
   )
