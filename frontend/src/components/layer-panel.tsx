@@ -182,9 +182,9 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
 
 
       {/* Layer Tabs */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-4">
         <Tabs defaultValue="controls" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mx-4 mt-4">
+          <TabsList className="grid w-full grid-cols-2 mt-4">
             <TabsTrigger value="controls" className="text-xs">
               Controls
             </TabsTrigger>
@@ -193,7 +193,7 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="controls" className="p-4 space-y-6">
+          <TabsContent value="controls" className="py-4 space-y-6">
             {/* Sea Level Rise Slider - only show for sea level rise layer AND when enabled */}
             {selectedLayer === "noaa_sea_level_rise" && seaLevelEnabled && (
               <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/30">
@@ -347,7 +347,7 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
 
           </TabsContent>
 
-          <TabsContent value="reference" className="p-4 space-y-4">
+          <TabsContent value="reference" className="py-4 space-y-4">
             <div className="text-sm">
               <div className="font-medium mb-1">Layer Name</div>
               <div className="text-muted-foreground text-xs">{layerConfig.name}</div>

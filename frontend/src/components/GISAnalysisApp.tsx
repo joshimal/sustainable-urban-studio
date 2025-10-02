@@ -19,29 +19,65 @@ export function GISAnalysisApp() {
     seaLevelEnabled: true,
     seaLevelOpacity: 0.6
   })
+  const [selectedMapId, setSelectedMapId] = useState<string | null>("1")
   const [projects, setProjects] = useState([
     {
       id: "1",
       name: "Sea Level Rise Analysis",
       description: "NOAA sea level rise projections for Nassau County",
-      date: "2024-01-15"
+      date: "2024-01-15",
+      config: {
+        seaLevelFeet: 3,
+        layerSettings: {
+          seaLevelEnabled: true,
+          seaLevelOpacity: 0.6
+        }
+      }
     },
     {
       id: "2",
       name: "Nassau County Overview",
       description: "Main view of Nassau County with climate data",
-      date: "2024-01-15"
+      date: "2024-01-15",
+      config: {
+        seaLevelFeet: 2,
+        layerSettings: {
+          seaLevelEnabled: false,
+          seaLevelOpacity: 0.4
+        }
+      }
     },
     {
       id: "3",
       name: "Temperature Analysis",
       description: "Heat map showing temperature projections",
-      date: "2024-01-14"
+      date: "2024-01-14",
+      config: {
+        seaLevelFeet: 5,
+        layerSettings: {
+          seaLevelEnabled: true,
+          seaLevelOpacity: 0.8
+        }
+      }
     }
   ])
 
   const handleDeleteProject = (projectId: string) => {
     setProjects(projects.filter(p => p.id !== projectId))
+    if (selectedMapId === projectId) {
+      setSelectedMapId(projects.length > 1 ? projects[0].id : null)
+    }
+  }
+
+  const handleSelectMap = (projectId: string) => {
+    setSelectedMapId(projectId)
+    const project = projects.find(p => p.id === projectId)
+    if (project && project.config) {
+      setSeaLevelFeet(project.config.seaLevelFeet)
+      setLayerSettings(project.config.layerSettings)
+      // Trigger data fetch with new settings
+      fetchSeaLevelRiseData(project.config.seaLevelFeet)
+    }
   }
 
   const handleSaveMap = () => {
@@ -51,10 +87,15 @@ export function GISAnalysisApp() {
       id: Date.now().toString(),
       name: mapName,
       description: `Custom GIS analysis - ${new Date().toLocaleDateString()}`,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      config: {
+        seaLevelFeet: seaLevelFeet,
+        layerSettings: { ...layerSettings }
+      }
     }
 
     setProjects([newProject, ...projects])
+    setSelectedMapId(newProject.id)
     setShowSaveDialog(false)
     setMapName("")
   }
@@ -196,22 +237,23 @@ export function GISAnalysisApp() {
 
         {/* Projects Section */}
         <div className="flex-1 overflow-y-auto px-4">
-          <h3 className="text-xs font-semibold text-muted-foreground mb-2">Projects</h3>
+          <h3 className="text-xs font-semibold text-muted-foreground mb-2 mt-4">Your Maps</h3>
 
           {projects.map((project, index) => (
             <div
               key={project.id}
+              onClick={() => handleSelectMap(project.id)}
               className={`mb-3 p-3 rounded-lg border ${
-                index === 0
+                selectedMapId === project.id
                   ? 'border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20'
                   : 'border-border hover:bg-muted/50'
               } cursor-pointer transition-colors group`}
             >
               <div className="flex items-start gap-3">
                 <div className={`w-8 h-8 rounded flex items-center justify-center flex-shrink-0 ${
-                  index === 0 ? 'bg-blue-500/20' : 'bg-muted'
+                  selectedMapId === project.id ? 'bg-blue-500/20' : 'bg-muted'
                 }`}>
-                  <Map className={`h-4 w-4 ${index === 0 ? 'text-blue-400' : ''}`} />
+                  <Map className={`h-4 w-4 ${selectedMapId === project.id ? 'text-blue-400' : ''}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-semibold mb-1">{project.name}</h4>
