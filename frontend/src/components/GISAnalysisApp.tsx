@@ -15,6 +15,10 @@ export function GISAnalysisApp() {
   const [seaLevelFeet, setSeaLevelFeet] = useState(3)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [mapName, setMapName] = useState("")
+  const [layerSettings, setLayerSettings] = useState({
+    seaLevelEnabled: true,
+    seaLevelOpacity: 0.6
+  })
   const [projects, setProjects] = useState([
     {
       id: "1",
@@ -247,7 +251,10 @@ export function GISAnalysisApp() {
       <div className="flex-1 flex">
         {/* Map View */}
         <div className="flex-1 relative">
-          <LeafletMap seaLevelRiseData={seaLevelRiseData} />
+          <LeafletMap
+            seaLevelRiseData={layerSettings.seaLevelEnabled ? seaLevelRiseData : null}
+            layerSettings={layerSettings}
+          />
 
           {/* Map Controls */}
           <div className="absolute top-4 right-4 flex flex-col gap-2">
@@ -296,6 +303,7 @@ export function GISAnalysisApp() {
             onClose={() => setLayerPanelOpen(false)}
             climateData={climateData}
             onSeaLevelChange={handleSeaLevelChange}
+            onLayerSettingsChange={setLayerSettings}
           />
         )}
       </div>

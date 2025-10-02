@@ -12,9 +12,10 @@ interface LayerPanelProps {
   onClose?: () => void
   climateData?: any
   onSeaLevelChange?: (feet: number) => void
+  onLayerSettingsChange?: (settings: any) => void
 }
 
-export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChange }: LayerPanelProps) {
+export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChange, onLayerSettingsChange }: LayerPanelProps) {
   const [dataSource, setDataSource] = useState("NOAA")
   const [seaLevelEnabled, setSeaLevelEnabled] = useState(true)
   const [floodExposureEnabled, setFloodExposureEnabled] = useState(false)
@@ -22,11 +23,21 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
   const [elevationEnabled, setElevationEnabled] = useState(false)
   const [waterQualityEnabled, setWaterQualityEnabled] = useState(false)
   const [datasetsExpanded, setDatasetsExpanded] = useState(true)
-  const [opacity, setOpacity] = useState([75])
+  const [seaLevelOpacity, setSeaLevelOpacity] = useState([60])
   const [size, setSize] = useState([8])
   const [temperatureThreshold, setTemperatureThreshold] = useState([3.2])
   const [seaLevelRange, setSeaLevelRange] = useState([3])
   const [borderWidth, setBorderWidth] = useState([1])
+
+  // Notify parent component of layer settings changes
+  const updateLayerSettings = (enabled: boolean, opacity: number) => {
+    if (onLayerSettingsChange) {
+      onLayerSettingsChange({
+        seaLevelEnabled: enabled,
+        seaLevelOpacity: opacity / 100
+      })
+    }
+  }
 
 
   const getLayerConfig = () => {
@@ -116,7 +127,10 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
                 <input
                   type="checkbox"
                   checked={seaLevelEnabled}
-                  onChange={(e) => setSeaLevelEnabled(e.target.checked)}
+                  onChange={(e) => {
+                    setSeaLevelEnabled(e.target.checked)
+                    updateLayerSettings(e.target.checked, seaLevelOpacity[0])
+                  }}
                   className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-sm">Sea Level Rise</span>
@@ -303,24 +317,25 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
               </div>
             </div>
 
-            {/* Opacity and Size */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Opacity Control for Sea Level Rise */}
+            {selectedLayer === "noaa_sea_level_rise" && seaLevelEnabled && (
               <div>
-                <label className="text-sm font-medium mb-2 block">Opacity</label>
+                <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
                 <div className="space-y-2">
-                  <Slider value={opacity} onValueChange={setOpacity} max={100} step={1} className="w-full" />
-                  <span className="text-xs text-muted-foreground">{opacity[0]}%</span>
+                  <Slider
+                    value={seaLevelOpacity}
+                    onValueChange={(value) => {
+                      setSeaLevelOpacity(value)
+                      updateLayerSettings(seaLevelEnabled, value[0])
+                    }}
+                    max={100}
+                    step={1}
+                    className="w-full"
+                  />
+                  <span className="text-xs text-muted-foreground">{seaLevelOpacity[0]}%</span>
                 </div>
               </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Size</label>
-                <div className="space-y-2">
-                  <Slider value={size} onValueChange={setSize} max={20} step={1} className="w-full" />
-                  <span className="text-xs text-muted-foreground">{size[0]} px</span>
-                </div>
-              </div>
-            </div>
+            )}
 
             <Separator />
 

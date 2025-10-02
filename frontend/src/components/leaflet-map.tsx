@@ -8,9 +8,13 @@ interface LeafletMapProps {
   className?: string
   climateData?: any
   seaLevelRiseData?: any
+  layerSettings?: {
+    seaLevelEnabled: boolean
+    seaLevelOpacity: number
+  }
 }
 
-export function LeafletMap({ className, seaLevelRiseData }: LeafletMapProps) {
+export function LeafletMap({ className, seaLevelRiseData, layerSettings }: LeafletMapProps) {
   console.log('LeafletMap component rendering...')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -137,11 +141,12 @@ export function LeafletMap({ className, seaLevelRiseData }: LeafletMapProps) {
 
         // Add new layer if data exists
         if (seaLevelRiseData && seaLevelRiseData.features) {
-          console.log('Adding sea level rise layer with', seaLevelRiseData.features.length, 'features')
+          const opacity = layerSettings?.seaLevelOpacity ?? 0.6
+          console.log('Adding sea level rise layer with', seaLevelRiseData.features.length, 'features, opacity:', opacity)
           geoJsonLayerRef.current = L.geoJSON(seaLevelRiseData, {
             style: {
               fillColor: '#3b82f6',
-              fillOpacity: 0.6,
+              fillOpacity: opacity,
               color: '#2563eb',
               weight: 1
             }
@@ -153,7 +158,7 @@ export function LeafletMap({ className, seaLevelRiseData }: LeafletMapProps) {
     }
 
     addSeaLevelLayer()
-  }, [seaLevelRiseData])
+  }, [seaLevelRiseData, layerSettings?.seaLevelOpacity])
 
   console.log('LeafletMap rendering return statement, mapRef.current:', mapRef.current)
 
