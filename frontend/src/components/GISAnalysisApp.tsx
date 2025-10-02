@@ -6,13 +6,12 @@ import { Input } from "./ui/input"
 import { Layers, Search, ZoomIn, ZoomOut, Maximize2, Map, Plus, X, Trash2 } from "lucide-react"
 import { LayerPanel } from "./layer-panel"
 import { LeafletMap } from "./leaflet-map"
-import { LayerList } from "./layer-list"
 
 export function GISAnalysisApp() {
   const [selectedLayer, setSelectedLayer] = useState("noaa_sea_level_rise")
   const [layerPanelOpen, setLayerPanelOpen] = useState(true)
   const [seaLevelRiseData, setSeaLevelRiseData] = useState(null)
-  const [seaLevelFeet, setSeaLevelFeet] = useState(3)
+  const [seaLevelFeet, setSeaLevelFeet] = useState(0)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [mapName, setMapName] = useState("")
   const [layerSettings, setLayerSettings] = useState({
@@ -100,82 +99,6 @@ export function GISAnalysisApp() {
     setMapName("")
   }
 
-  // Climate data state - integrating with your existing APIs
-  const [climateData, setClimateData] = useState({
-    temperature: { value: 3.2, loading: true, timeSeries: null, data: null },
-    seaLevel: { value: 2.5, loading: true, projections: null, summary: null },
-    airQuality: { value: 85, loading: true, timeSeries: null, data: null },
-    precipitation: { value: 85, loading: true, timeSeries: null },
-    greenSpace: { value: 35, loading: true, timeSeries: null, benefits: null },
-    loading: false,
-    error: null
-  });
-
-  // Load climate data from your existing APIs
-  useEffect(() => {
-    const loadClimateData = async () => {
-      try {
-        console.log('🌍 Loading climate data from APIs...');
-
-        // Use backend NOAA computed series endpoints (defaults to JFK station, 5 years max)
-        const [tempRes, precipRes] = await Promise.all([
-          fetch('http://localhost:3001/api/climate/noaa/temperature/anomaly?stationid=GHCND:USW00094789&years=5'),
-          fetch('http://localhost:3001/api/climate/noaa/precipitation/trend?stationid=GHCND:USW00094789&years=5')
-        ]);
-
-        const tempPayload = await tempRes.json();
-        const precipPayload = await precipRes.json();
-
-        console.log('✅ Climate APIs loaded successfully');
-
-        setClimateData({
-          temperature: {
-            value: (tempPayload?.data?.trendCPerDecade ?? 0),
-            loading: false,
-            timeSeries: tempPayload?.data?.anomaliesC || tempPayload?.data?.timeseries || null,
-            data: tempPayload?.data || null
-          },
-          seaLevel: {
-            value: 2.5,
-            loading: false,
-            projections: null,
-            summary: null
-          },
-          airQuality: {
-            value: 85,
-            loading: false,
-            timeSeries: null,
-            data: null
-          },
-          precipitation: {
-            value: Number((precipPayload?.data?.trendMmPerDecade ?? 0).toFixed(0)),
-            loading: false,
-            timeSeries: precipPayload?.data?.timeseries || null
-          },
-          greenSpace: {
-            value: 35,
-            loading: false,
-            timeSeries: null,
-            benefits: null
-          },
-          loading: false,
-          error: null
-        });
-
-      } catch (error) {
-        console.error('❌ Error loading climate data:', error);
-        setClimateData(prev => ({
-          ...prev,
-          loading: false,
-          error: 'Failed to load climate data - using mock values'
-        }));
-      }
-    };
-
-    // Load climate data after a short delay
-    const timer = setTimeout(loadClimateData, 1000);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Fetch NOAA Sea Level Rise data
   const fetchSeaLevelRiseData = async (feet: number) => {
@@ -292,14 +215,6 @@ export function GISAnalysisApp() {
         </div>
       </div>
 
-      {/* Removed LayerList component */}
-      <div className="hidden">
-        <LayerList
-          selectedLayer={selectedLayer}
-          onLayerSelect={setSelectedLayer}
-          climateData={climateData}
-        />
-      </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex">
@@ -308,6 +223,7 @@ export function GISAnalysisApp() {
           <LeafletMap
             seaLevelRiseData={layerSettings.seaLevelEnabled ? seaLevelRiseData : null}
             layerSettings={layerSettings}
+            seaLevelFeet={seaLevelFeet}
           />
 
           {/* Map Controls */}
@@ -335,19 +251,6 @@ export function GISAnalysisApp() {
               Layers
             </Button>
           </div>
-
-          {/* Climate Status Overlay */}
-          <div className="absolute bottom-4 left-4 bg-card/95 backdrop-blur-sm rounded-lg shadow-lg p-3 border border-gray-700">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-sm font-semibold">Nassau Climate Analysis</span>
-            </div>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <div>🌡️ Temperature: +{climateData.temperature.value.toFixed(1)}°C</div>
-              <div>🌊 Sea Level: +{climateData.seaLevel.value}cm</div>
-              <div>💨 AQI: {climateData.airQuality.value}</div>
-            </div>
-          </div>
         </div>
 
         {/* Right Panel - Layer Controls */}
@@ -355,9 +258,9 @@ export function GISAnalysisApp() {
           <LayerPanel
             selectedLayer={selectedLayer}
             onClose={() => setLayerPanelOpen(false)}
-            climateData={climateData}
             onSeaLevelChange={handleSeaLevelChange}
             onLayerSettingsChange={setLayerSettings}
+            seaLevelFeet={seaLevelFeet}
           />
         )}
       </div>

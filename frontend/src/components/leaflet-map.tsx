@@ -8,13 +8,14 @@ interface LeafletMapProps {
   className?: string
   climateData?: any
   seaLevelRiseData?: any
+  seaLevelFeet?: number
   layerSettings?: {
     seaLevelEnabled: boolean
     seaLevelOpacity: number
   }
 }
 
-export function LeafletMap({ className, seaLevelRiseData, layerSettings }: LeafletMapProps) {
+export function LeafletMap({ className, seaLevelRiseData, layerSettings, seaLevelFeet = 2 }: LeafletMapProps) {
   console.log('LeafletMap component rendering...')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -76,7 +77,7 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings }: Leafl
         })
 
         console.log('Map created, adding tile layer...')
-        // Add tile layer
+        // Add dark tile layer
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
           attribution: '© CartoDB',
           subdomains: 'abcd',
@@ -125,7 +126,7 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings }: Leafl
     }
   }, [isMounted])
 
-  // Handle sea level rise data overlay
+  // Handle sea level rise data overlay using NOAA tile service
   useEffect(() => {
     if (!mapInstanceRef.current) return
 
@@ -139,17 +140,44 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings }: Leafl
           geoJsonLayerRef.current = null
         }
 
-        // Add new layer if data exists
-        if (seaLevelRiseData && seaLevelRiseData.features) {
+        // Add NOAA tile layer if enabled
+        if (layerSettings?.seaLevelEnabled) {
           const opacity = layerSettings?.seaLevelOpacity ?? 0.6
-          console.log('Adding sea level rise layer with', seaLevelRiseData.features.length, 'features, opacity:', opacity)
-          geoJsonLayerRef.current = L.geoJSON(seaLevelRiseData, {
-            style: {
-              fillColor: '#3b82f6',
-              fillOpacity: opacity,
-              color: '#2563eb',
-              weight: 1
+
+          console.log(`Adding NOAA ${seaLevelFeet}ft depth layer, opacity:`, opacity)
+
+          // Create a custom tile layer for ArcGIS export endpoint
+          const ArcGISTileLayer = (L as any).TileLayer.extend({
+            getTileUrl: function(coords: any) {
+              const map = mapInstanceRef.current
+              const tileSize = this.getTileSize()
+              const nwPoint = coords.scaleBy(tileSize)
+              const sePoint = nwPoint.add(tileSize)
+
+              const nw = map.unproject(nwPoint, coords.z)
+              const se = map.unproject(sePoint, coords.z)
+
+              // Convert to Web Mercator coordinates
+              const nwMerc = (L as any).Projection.SphericalMercator.project(nw)
+              const seMerc = (L as any).Projection.SphericalMercator.project(se)
+
+              const bbox = `${nwMerc.x},${seMerc.y},${seMerc.x},${nwMerc.y}`
+
+              return `https://coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${seaLevelFeet}ft/MapServer/export?` +
+                `bbox=${bbox}&` +
+                `bboxSR=3857&` +
+                `layers=show:1&` +
+                `size=256,256&` +
+                `imageSR=3857&` +
+                `format=png&` +
+                `transparent=true&` +
+                `f=image`
             }
+          })
+
+          geoJsonLayerRef.current = new ArcGISTileLayer('', {
+            opacity: opacity,
+            attribution: '© NOAA Office for Coastal Management'
           }).addTo(mapInstanceRef.current)
         }
       } catch (err) {
@@ -158,7 +186,7 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings }: Leafl
     }
 
     addSeaLevelLayer()
-  }, [seaLevelRiseData, layerSettings?.seaLevelOpacity])
+  }, [seaLevelFeet, layerSettings?.seaLevelOpacity, layerSettings?.seaLevelEnabled])
 
   console.log('LeafletMap rendering return statement, mapRef.current:', mapRef.current)
 

@@ -10,12 +10,12 @@ import { X, MoreHorizontal, Plus, ChevronDown, ChevronRight } from "lucide-react
 interface LayerPanelProps {
   selectedLayer: string
   onClose?: () => void
-  climateData?: any
   onSeaLevelChange?: (feet: number) => void
   onLayerSettingsChange?: (settings: any) => void
+  seaLevelFeet?: number
 }
 
-export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChange, onLayerSettingsChange }: LayerPanelProps) {
+export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSettingsChange, seaLevelFeet = 0 }: LayerPanelProps) {
   const [dataSource, setDataSource] = useState("NOAA")
   const [seaLevelEnabled, setSeaLevelEnabled] = useState(true)
   const [floodExposureEnabled, setFloodExposureEnabled] = useState(false)
@@ -26,7 +26,6 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
   const [seaLevelOpacity, setSeaLevelOpacity] = useState([60])
   const [size, setSize] = useState([8])
   const [temperatureThreshold, setTemperatureThreshold] = useState([3.2])
-  const [seaLevelRange, setSeaLevelRange] = useState([3])
   const [borderWidth, setBorderWidth] = useState([1])
 
   // Notify parent component of layer settings changes
@@ -47,32 +46,24 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
           name: "NOAA Sea Level Rise",
           displayStyle: "polygon",
           colorScale: "from-blue-400 via-cyan-500 to-blue-600",
-          currentValue: climateData?.seaLevel?.value || 2.5,
-          unit: "cm rise",
         }
       case "noaa_temperature_anomaly":
         return {
           name: "NOAA Temperature Anomaly",
           displayStyle: "heatmap",
           colorScale: "from-blue-500 via-yellow-500 to-red-500",
-          currentValue: climateData?.temperature?.value || 3.2,
-          unit: "°C",
         }
       case "noaa_precipitation_trend":
         return {
           name: "NOAA Precipitation Trend",
           displayStyle: "heatmap",
           colorScale: "from-blue-400 via-sky-400 to-indigo-500",
-          currentValue: climateData?.precipitation?.value || 85,
-          unit: "index",
         }
       default:
         return {
           name: "NOAA Climate Layer",
           displayStyle: "heatmap",
           colorScale: "from-blue-500 via-green-500 to-red-500",
-          currentValue: 0,
-          unit: "",
         }
     }
   }
@@ -199,13 +190,12 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
               <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/30">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-sm font-medium">🌊 Sea Level Rise</label>
-                  <span className="text-lg font-bold text-blue-400">{seaLevelRange[0]} feet</span>
+                  <span className="text-lg font-bold text-blue-400">{seaLevelFeet} feet</span>
                 </div>
                 <div className="space-y-2">
                   <Slider
-                    value={seaLevelRange}
+                    value={[seaLevelFeet]}
                     onValueChange={(value) => {
-                      setSeaLevelRange(value)
                       if (onSeaLevelChange) {
                         onSeaLevelChange(value[0])
                       }
@@ -221,11 +211,11 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
                     <span>10ft</span>
                   </div>
                   <div className="text-xs text-blue-300 mt-2">
-                    {seaLevelRange[0] === 0 && "Baseline (Current)"}
-                    {seaLevelRange[0] === 1 && "Low (~2050)"}
-                    {seaLevelRange[0] > 1 && seaLevelRange[0] <= 3 && "Intermediate (~2100)"}
-                    {seaLevelRange[0] > 3 && seaLevelRange[0] <= 6 && "High (~2100)"}
-                    {seaLevelRange[0] > 6 && "Planning Scenario"}
+                    {seaLevelFeet === 0 && "Baseline (Current)"}
+                    {seaLevelFeet === 1 && "Low (~2050)"}
+                    {seaLevelFeet > 1 && seaLevelFeet <= 3 && "Intermediate (~2100)"}
+                    {seaLevelFeet > 3 && seaLevelFeet <= 6 && "High (~2100)"}
+                    {seaLevelFeet > 6 && "Planning Scenario"}
                   </div>
                 </div>
               </div>
