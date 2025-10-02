@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
-import { ArrowLeft, Layers, Search, ZoomIn, ZoomOut, Maximize2, Map, Plus, X, Trash2 } from "lucide-react"
+import { Layers, Search, ZoomIn, ZoomOut, Maximize2, Map, Plus, X, Trash2 } from "lucide-react"
 import { LayerPanel } from "./layer-panel"
 import { LeafletMap } from "./leaflet-map"
 import { LayerList } from "./layer-list"
@@ -42,6 +42,21 @@ export function GISAnalysisApp() {
 
   const handleDeleteProject = (projectId: string) => {
     setProjects(projects.filter(p => p.id !== projectId))
+  }
+
+  const handleSaveMap = () => {
+    if (!mapName.trim()) return
+
+    const newProject = {
+      id: Date.now().toString(),
+      name: mapName,
+      description: `Custom GIS analysis - ${new Date().toLocaleDateString()}`,
+      date: new Date().toISOString().split('T')[0]
+    }
+
+    setProjects([newProject, ...projects])
+    setShowSaveDialog(false)
+    setMapName("")
   }
 
   // Climate data state - integrating with your existing APIs
@@ -170,10 +185,7 @@ export function GISAnalysisApp() {
       <div className="w-80 bg-card border-r border-border flex flex-col">
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3 mb-4">
-            <Button variant="ghost" size="sm" className="p-2">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="text-lg font-semibold">Climate Analysis</h1>
+            <h1 className="text-lg font-semibold">GIS Analysis</h1>
           </div>
 
           <div className="relative mb-4">
@@ -348,12 +360,7 @@ export function GISAnalysisApp() {
               </Button>
               <Button
                 size="sm"
-                onClick={() => {
-                  console.log("Saving map:", mapName)
-                  // TODO: Implement save functionality
-                  setShowSaveDialog(false)
-                  setMapName("")
-                }}
+                onClick={handleSaveMap}
                 disabled={!mapName.trim()}
               >
                 Save

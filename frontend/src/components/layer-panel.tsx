@@ -183,59 +183,17 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
 
       {/* Layer Tabs */}
       <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="style" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mx-4 mt-4">
-            <TabsTrigger value="general" className="text-xs">
-              General
+        <Tabs defaultValue="controls" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mx-4 mt-4">
+            <TabsTrigger value="controls" className="text-xs">
+              Controls
             </TabsTrigger>
-            <TabsTrigger value="data" className="text-xs">
-              Data
-            </TabsTrigger>
-            <TabsTrigger value="style" className="text-xs">
-              Style
+            <TabsTrigger value="reference" className="text-xs">
+              Reference
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general" className="p-4 space-y-4">
-            <div className="text-sm">
-              <div className="font-medium mb-1">Layer Name</div>
-              <div className="text-muted-foreground text-xs">{layerConfig.name}</div>
-            </div>
-
-            <div className="text-sm">
-              <div className="font-medium mb-1">Data Source</div>
-              <div className="text-muted-foreground text-xs">Climate API - Nassau County</div>
-            </div>
-
-            <div className="text-sm">
-              <div className="font-medium mb-1">Last Updated</div>
-              <div className="text-muted-foreground text-xs">Real-time</div>
-            </div>
-
-            <div className="text-sm">
-              <div className="font-medium mb-1">Resolution</div>
-              <div className="text-muted-foreground text-xs">1km² grid</div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="data" className="p-4 space-y-4">
-            <div className="text-sm">
-              <div className="font-medium mb-1">Data Source</div>
-              <div className="text-muted-foreground text-xs">Climate API - Nassau County</div>
-            </div>
-
-            <div className="text-sm">
-              <div className="font-medium mb-1">Last Updated</div>
-              <div className="text-muted-foreground text-xs">Real-time</div>
-            </div>
-
-            <div className="text-sm">
-              <div className="font-medium mb-1">Resolution</div>
-              <div className="text-muted-foreground text-xs">1km² grid</div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="style" className="p-4 space-y-6">
+          <TabsContent value="controls" className="p-4 space-y-6">
             {/* Sea Level Rise Slider - only show for sea level rise layer AND when enabled */}
             {selectedLayer === "noaa_sea_level_rise" && seaLevelEnabled && (
               <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/30">
@@ -387,16 +345,32 @@ export function LayerPanel({ selectedLayer, onClose, climateData, onSeaLevelChan
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2 pt-4">
-              <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-                <Plus className="h-3 w-3" />
-                Label
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-                <Plus className="h-3 w-3" />
-                Badge
-              </Button>
+          </TabsContent>
+
+          <TabsContent value="reference" className="p-4 space-y-4">
+            <div className="text-sm">
+              <div className="font-medium mb-1">Layer Name</div>
+              <div className="text-muted-foreground text-xs">{layerConfig.name}</div>
+            </div>
+
+            <div className="text-sm">
+              <div className="font-medium mb-1">Data Source</div>
+              <div className="text-muted-foreground text-xs">NOAA Climate API - Nassau County</div>
+            </div>
+
+            <div className="text-sm">
+              <div className="font-medium mb-1">Last Updated</div>
+              <div className="text-muted-foreground text-xs">Real-time</div>
+            </div>
+
+            <div className="text-sm">
+              <div className="font-medium mb-1">Resolution</div>
+              <div className="text-muted-foreground text-xs">1km² grid</div>
+            </div>
+
+            <div className="text-sm">
+              <div className="font-medium mb-1">Coverage Area</div>
+              <div className="text-muted-foreground text-xs">Nassau County, NY</div>
             </div>
           </TabsContent>
 
