@@ -1,20 +1,23 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { map, tileLayer, marker } from "leaflet"
+// Defer Leaflet import to runtime with explicit ESM build to avoid Vite export mismatches
+// We'll dynamically import inside useEffect
 
 interface LeafletMapProps {
   className?: string
   climateData?: any
+  seaLevelRiseData?: any
 }
 
-export function LeafletMap({ className }: LeafletMapProps) {
+export function LeafletMap({ className, seaLevelRiseData }: LeafletMapProps) {
   console.log('LeafletMap component rendering...')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const mapInstanceRef = useRef<any>(null)
   const mapRef = useRef<HTMLDivElement>(null)
+  const geoJsonLayerRef = useRef<any>(null)
 
   // Track when component is mounted and ref is ready
   useEffect(() => {
@@ -36,7 +39,7 @@ export function LeafletMap({ className }: LeafletMapProps) {
     const initMap = async () => {
       try {
         console.log('Starting map initialization...')
-        console.log('Using static Leaflet imports')
+        console.log('Dynamically importing Leaflet ESM')
 
         // Wait for container to be available
         let attempts = 0
@@ -57,8 +60,11 @@ export function LeafletMap({ className }: LeafletMapProps) {
         }
 
         console.log('Container found, creating map...')
-        // Create map using static imports
-        const leafletMap = map(mapRef.current, {
+        // Dynamically import Leaflet ESM build
+        const L = await import('leaflet/dist/leaflet-src.esm.js')
+
+        // Create map
+        const leafletMap = L.map(mapRef.current as any, {
           center: [40.7589, -73.9851], // Nassau County
           zoom: 10,
           zoomControl: true,
@@ -67,7 +73,7 @@ export function LeafletMap({ className }: LeafletMapProps) {
 
         console.log('Map created, adding tile layer...')
         // Add tile layer
-        tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
           attribution: '© CartoDB',
           subdomains: 'abcd',
           maxZoom: 19
@@ -75,7 +81,7 @@ export function LeafletMap({ className }: LeafletMapProps) {
 
         console.log('Adding marker...')
         // Add a simple marker to test
-        marker([40.7589, -73.9851]).addTo(leafletMap)
+        L.marker([40.7589, -73.9851]).addTo(leafletMap)
           .bindPopup('Nassau County, NY')
 
         console.log('Map initialization complete!')
@@ -114,6 +120,40 @@ export function LeafletMap({ className }: LeafletMapProps) {
       }
     }
   }, [isMounted])
+
+  // Handle sea level rise data overlay
+  useEffect(() => {
+    if (!mapInstanceRef.current) return
+
+    const addSeaLevelLayer = async () => {
+      try {
+        const L = await import('leaflet/dist/leaflet-src.esm.js')
+
+        // Remove existing layer if present
+        if (geoJsonLayerRef.current) {
+          mapInstanceRef.current.removeLayer(geoJsonLayerRef.current)
+          geoJsonLayerRef.current = null
+        }
+
+        // Add new layer if data exists
+        if (seaLevelRiseData && seaLevelRiseData.features) {
+          console.log('Adding sea level rise layer with', seaLevelRiseData.features.length, 'features')
+          geoJsonLayerRef.current = L.geoJSON(seaLevelRiseData, {
+            style: {
+              fillColor: '#3b82f6',
+              fillOpacity: 0.6,
+              color: '#2563eb',
+              weight: 1
+            }
+          }).addTo(mapInstanceRef.current)
+        }
+      } catch (err) {
+        console.error('Error adding sea level rise layer:', err)
+      }
+    }
+
+    addSeaLevelLayer()
+  }, [seaLevelRiseData])
 
   console.log('LeafletMap rendering return statement, mapRef.current:', mapRef.current)
 

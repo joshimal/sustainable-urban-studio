@@ -15,42 +15,34 @@ interface Layer {
   thumbnail: string
 }
 
+// NOAA-only climate layers
 const layers: Layer[] = [
   {
-    id: "temperature_heatmap",
-    name: "Temperature Projections",
-    type: "Heatmap",
-    owner: "Climate API",
-    region: "Nassau County",
-    visible: true,
-    thumbnail: "/temperature-heatmap.jpg",
-  },
-  {
-    id: "sea_level_rise",
-    name: "Sea Level Rise",
+    id: "noaa_sea_level_rise",
+    name: "NOAA Sea Level Rise",
     type: "Polygon",
-    owner: "Climate API",
+    owner: "NOAA",
     region: "Nassau County",
     visible: true,
     thumbnail: "/sea-level-rise.jpg",
   },
   {
-    id: "air_quality",
-    name: "Air Quality Monitoring",
-    type: "Point",
-    owner: "Environment API",
-    region: "Nassau County",
-    visible: true,
-    thumbnail: "/air-quality-stations.jpg",
-  },
-  {
-    id: "green_space",
-    name: "Green Space Coverage",
+    id: "noaa_temperature_anomaly",
+    name: "NOAA Temperature Anomaly",
     type: "Raster",
-    owner: "Urban API",
+    owner: "NOAA",
     region: "Nassau County",
     visible: false,
-    thumbnail: "/green-space-coverage.jpg",
+    thumbnail: "/temperature-heatmap.jpg",
+  },
+  {
+    id: "noaa_precipitation_trend",
+    name: "NOAA Precipitation Trend",
+    type: "Raster",
+    owner: "NOAA",
+    region: "Nassau County",
+    visible: false,
+    thumbnail: "/placeholder.svg",
   },
 ]
 

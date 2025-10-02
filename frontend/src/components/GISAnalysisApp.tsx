@@ -3,18 +3,42 @@
 import { useState, useEffect } from "react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
-import { ArrowLeft, Layers, Search, ZoomIn, ZoomOut, Maximize2, Map, BarChart3 } from "lucide-react"
+import { ArrowLeft, Layers, Search, ZoomIn, ZoomOut, Maximize2, Map, Plus, X, Trash2 } from "lucide-react"
 import { LayerPanel } from "./layer-panel"
-import { VisualizationPanel } from "./visualization-panel"
-import { MapView } from "./map-view"
 import { LeafletMap } from "./leaflet-map"
 import { LayerList } from "./layer-list"
 
 export function GISAnalysisApp() {
-  const [selectedLayer, setSelectedLayer] = useState("temperature_heatmap")
+  const [selectedLayer, setSelectedLayer] = useState("noaa_sea_level_rise")
   const [layerPanelOpen, setLayerPanelOpen] = useState(true)
-  const [vizPanelOpen, setVizPanelOpen] = useState(true)
-  const [useLeafletMap, setUseLeafletMap] = useState(true)
+  const [seaLevelRiseData, setSeaLevelRiseData] = useState(null)
+  const [seaLevelFeet, setSeaLevelFeet] = useState(3)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [mapName, setMapName] = useState("")
+  const [projects, setProjects] = useState([
+    {
+      id: "1",
+      name: "Sea Level Rise Analysis",
+      description: "NOAA sea level rise projections for Nassau County",
+      date: "2024-01-15"
+    },
+    {
+      id: "2",
+      name: "Nassau County Overview",
+      description: "Main view of Nassau County with climate data",
+      date: "2024-01-15"
+    },
+    {
+      id: "3",
+      name: "Temperature Analysis",
+      description: "Heat map showing temperature projections",
+      date: "2024-01-14"
+    }
+  ])
+
+  const handleDeleteProject = (projectId: string) => {
+    setProjects(projects.filter(p => p.id !== projectId))
+  }
 
   // Climate data state - integrating with your existing APIs
   const [climateData, setClimateData] = useState({
@@ -33,51 +57,46 @@ export function GISAnalysisApp() {
       try {
         console.log('🌍 Loading climate data from APIs...');
 
-        const [tempRes, seaRes, airRes, precipRes, greenRes] = await Promise.all([
-          fetch('http://localhost:3002/api/climate/temperature/heatmap?year=2030&scenario=moderate'),
-          fetch('http://localhost:3002/api/climate/sea-level-rise/projection?level=2.5&timeframe=2050'),
-          fetch('http://localhost:3002/api/environment/air-quality/index?pollutant=pm25'),
-          fetch('http://localhost:3002/api/climate/precipitation/annual?year=2030'),
-          fetch('http://localhost:3002/api/urban/green-space/coverage?percentage=35')
+        // Use backend NOAA computed series endpoints (defaults to JFK station, 5 years max)
+        const [tempRes, precipRes] = await Promise.all([
+          fetch('http://localhost:3001/api/climate/noaa/temperature/anomaly?stationid=GHCND:USW00094789&years=5'),
+          fetch('http://localhost:3001/api/climate/noaa/precipitation/trend?stationid=GHCND:USW00094789&years=5')
         ]);
 
-        const tempData = await tempRes.json();
-        const seaData = await seaRes.json();
-        const airData = await airRes.json();
-        const precipData = await precipRes.json();
-        const greenData = await greenRes.json();
+        const tempPayload = await tempRes.json();
+        const precipPayload = await precipRes.json();
 
-        console.log('✅ Climate APIs loaded successfully', { tempData, seaData, airData });
+        console.log('✅ Climate APIs loaded successfully');
 
         setClimateData({
           temperature: {
-            value: tempData.projectedIncrease || 3.2,
+            value: (tempPayload?.data?.trendCPerDecade ?? 0),
             loading: false,
-            timeSeries: tempData.timeSeries,
-            data: tempData.data
+            timeSeries: tempPayload?.data?.anomaliesC || tempPayload?.data?.timeseries || null,
+            data: tempPayload?.data || null
           },
           seaLevel: {
-            value: seaData.seaLevelRise || 2.5,
+            value: 2.5,
             loading: false,
-            projections: seaData.projections,
-            summary: seaData.summary
+            projections: null,
+            summary: null
           },
           airQuality: {
-            value: Math.round(airData.data?.[0]?.aqi || 85),
+            value: 85,
             loading: false,
-            timeSeries: airData.timeSeries,
-            data: airData.data
+            timeSeries: null,
+            data: null
           },
           precipitation: {
-            value: Math.round(precipData.timeSeries?.[10]?.value || 85),
+            value: Number((precipPayload?.data?.trendMmPerDecade ?? 0).toFixed(0)),
             loading: false,
-            timeSeries: precipData.timeSeries
+            timeSeries: precipPayload?.data?.timeseries || null
           },
           greenSpace: {
-            value: Math.round(greenData.data?.[0]?.greenSpaceCoverage || 35),
+            value: 35,
             loading: false,
-            timeSeries: greenData.timeSeries,
-            benefits: greenData.benefits
+            timeSeries: null,
+            benefits: null
           },
           loading: false,
           error: null
@@ -98,6 +117,49 @@ export function GISAnalysisApp() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Fetch NOAA Sea Level Rise data
+  const fetchSeaLevelRiseData = async (feet: number) => {
+    try {
+      console.log(`🌊 Fetching NOAA sea level rise data for ${feet}ft...`);
+
+      // Nassau County bounding box
+      const bounds = {
+        north: 40.85,
+        south: 40.60,
+        east: -73.40,
+        west: -73.75
+      };
+
+      const response = await fetch(
+        `http://localhost:3001/api/noaa/sea-level-rise?feet=${feet}&north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}`
+      );
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setSeaLevelRiseData(result.data);
+        console.log(`✅ Loaded ${result.data.features?.length || 0} sea level rise features`);
+      } else {
+        console.error('❌ Failed to load NOAA data:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching NOAA data:', error);
+    }
+  };
+
+  // Handle sea level change from slider
+  const handleSeaLevelChange = (feet: number) => {
+    setSeaLevelFeet(feet);
+    fetchSeaLevelRiseData(feet);
+  };
+
+  // Load initial sea level rise data
+  useEffect(() => {
+    if (selectedLayer === "noaa_sea_level_rise") {
+      fetchSeaLevelRiseData(seaLevelFeet);
+    }
+  }, [selectedLayer]);
+
   return (
     <div className="h-screen bg-background text-foreground flex">
       {/* Left Sidebar - Layer List */}
@@ -110,28 +172,70 @@ export function GISAnalysisApp() {
             <h1 className="text-lg font-semibold">Climate Analysis</h1>
           </div>
 
-          <div className="relative mb-3">
+          <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search layers..." className="pl-10 bg-muted/50" />
-          </div>
-
-          <div className="space-y-2">
-            <Button
-              variant={useLeafletMap ? "default" : "outline"}
-              size="sm"
-              onClick={() => setUseLeafletMap(!useLeafletMap)}
-              className="w-full flex items-center gap-2"
-            >
-              <Map className="h-4 w-4" />
-              {useLeafletMap ? "Interactive Map" : "Demo View"}
-            </Button>
-
-            <div className="text-xs text-center">
-              <span className="text-green-400">✓ Nassau County Climate Data</span>
-            </div>
+            <Input placeholder="Search saved maps..." className="pl-10 bg-muted/50" />
           </div>
         </div>
 
+        {/* Projects Section */}
+        <div className="flex-1 overflow-y-auto px-4">
+          <h3 className="text-xs font-semibold text-muted-foreground mb-2">Projects</h3>
+
+          {projects.map((project, index) => (
+            <div
+              key={project.id}
+              className={`mb-3 p-3 rounded-lg border ${
+                index === 0
+                  ? 'border-blue-500/50 bg-blue-500/10 hover:bg-blue-500/20'
+                  : 'border-border hover:bg-muted/50'
+              } cursor-pointer transition-colors group`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded flex items-center justify-center flex-shrink-0 ${
+                  index === 0 ? 'bg-blue-500/20' : 'bg-muted'
+                }`}>
+                  <Map className={`h-4 w-4 ${index === 0 ? 'text-blue-400' : ''}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-semibold mb-1">{project.name}</h4>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-1">
+                    {project.description}
+                  </p>
+                  <span className="text-xs text-muted-foreground">{project.date}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteProject(project.id)
+                  }}
+                  className="p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="h-4 w-4 text-red-400" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Save Map Button */}
+        <div className="p-4 border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setShowSaveDialog(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Save Map
+          </Button>
+        </div>
+      </div>
+
+      {/* Removed LayerList component */}
+      <div className="hidden">
         <LayerList
           selectedLayer={selectedLayer}
           onLayerSelect={setSelectedLayer}
@@ -143,7 +247,7 @@ export function GISAnalysisApp() {
       <div className="flex-1 flex">
         {/* Map View */}
         <div className="flex-1 relative">
-          {useLeafletMap ? <LeafletMap climateData={climateData} /> : <MapView />}
+          <LeafletMap seaLevelRiseData={seaLevelRiseData} />
 
           {/* Map Controls */}
           <div className="absolute top-4 right-4 flex flex-col gap-2">
@@ -169,15 +273,6 @@ export function GISAnalysisApp() {
               <Layers className="h-4 w-4" />
               Layers
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setVizPanelOpen(!vizPanelOpen)}
-              className="flex items-center gap-2"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Charts
-            </Button>
           </div>
 
           {/* Climate Status Overlay */}
@@ -200,16 +295,64 @@ export function GISAnalysisApp() {
             selectedLayer={selectedLayer}
             onClose={() => setLayerPanelOpen(false)}
             climateData={climateData}
+            onSeaLevelChange={handleSeaLevelChange}
           />
         )}
       </div>
 
-      {/* Visualization Panel */}
-      {vizPanelOpen && (
-        <VisualizationPanel
-          onClose={() => setVizPanelOpen(false)}
-          climateData={climateData}
-        />
+      {/* Save Map Dialog */}
+      {showSaveDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000]">
+          <div className="bg-card border border-border rounded-lg w-96 shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h3 className="font-semibold">Save Map</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowSaveDialog(false)
+                  setMapName("")
+                }}
+                className="p-1"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <label className="text-sm font-medium mb-2 block">Map Name</label>
+              <Input
+                value={mapName}
+                onChange={(e) => setMapName(e.target.value)}
+                placeholder="Enter map name..."
+                className="w-full"
+              />
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowSaveDialog(false)
+                  setMapName("")
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  console.log("Saving map:", mapName)
+                  // TODO: Implement save functionality
+                  setShowSaveDialog(false)
+                  setMapName("")
+                }}
+                disabled={!mapName.trim()}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -24,6 +24,7 @@ interface MapboxViewerProps {
   zoom?: number;
   pitch?: number;
   bearing?: number;
+  seaLevelRiseData?: any;
 }
 
 interface PopupInfo {
@@ -43,7 +44,8 @@ const MapboxViewer: React.FC<MapboxViewerProps> = ({
   center = [-73.5143, 40.7259],
   zoom = 10,
   pitch = 0,
-  bearing = 0
+  bearing = 0,
+  seaLevelRiseData = null
 }) => {
   // State management
   const [viewport, setViewport] = useState({
@@ -384,6 +386,21 @@ const MapboxViewer: React.FC<MapboxViewerProps> = ({
               layout={{ visibility: layerVisibility['lirr-lines'] ? 'visible' : 'none' }}
             />
           </Source>
+
+          {/* NOAA Sea Level Rise Overlay */}
+          {seaLevelRiseData && (
+            <Source id="sea-level-rise-source" type="geojson" data={seaLevelRiseData}>
+              <Layer
+                id="sea-level-rise-layer"
+                type="fill"
+                paint={{
+                  'fill-color': '#3b82f6',
+                  'fill-opacity': 0.6,
+                  'fill-outline-color': '#2563eb',
+                }}
+              />
+            </Source>
+          )}
 
           {/* 3D Buildings Layer */}
           <Layer

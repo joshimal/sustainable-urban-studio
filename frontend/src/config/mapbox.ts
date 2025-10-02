@@ -1,7 +1,7 @@
 // Mapbox GL JS Configuration
 export const MAPBOX_CONFIG = {
-  // Using a demo token for development - replace with your own token in production
-  ACCESS_TOKEN: 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw',
+  // Reads token from env; fallback is empty (must be provided by developer)
+  ACCESS_TOKEN: (import.meta as any).env?.VITE_MAPBOX_TOKEN || '',
 
   // Default map settings
   DEFAULT_VIEWPORT: {

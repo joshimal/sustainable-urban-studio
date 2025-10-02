@@ -8,21 +8,14 @@ interface VisualizationPanelProps {
   climateData?: any
 }
 
+// NOAA-focused charts only
 const chartTypes = [
-  { key: "temperatureTrends", name: "Temperature Trends", icon: "🌡️", description: "Historical and projected temperature data" },
-  { key: "seaLevelRise", name: "Sea Level Rise", icon: "🌊", description: "Coastal flooding projections" },
-  { key: "airQuality", name: "Air Quality Index", icon: "💨", description: "Real-time air quality metrics" },
-  { key: "climateSummary", name: "Climate Summary", icon: "📈", description: "Comprehensive climate overview" },
-  { key: "riskAssessment", name: "Risk Assessment", icon: "⚠️", description: "Environmental risk analysis" },
+  { key: "seaLevelRise", name: "Sea Level Rise", icon: "🌊", description: "Coastal flooding projections (NOAA)" },
 ]
 
 export function VisualizationPanel({ onClose, climateData }: VisualizationPanelProps) {
   const [activeCharts, setActiveCharts] = useState({
-    temperatureTrends: true,
-    seaLevelRise: false,
-    airQuality: false,
-    climateSummary: false,
-    riskAssessment: false
+    seaLevelRise: true
   })
 
   const toggleChart = (chartKey: string) => {

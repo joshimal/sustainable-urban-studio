@@ -22,6 +22,7 @@ const { initializeDatabase, getProgressStatus } = require('./utils/database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const NOAA_CDO_TOKEN = process.env.NOAA_CDO_TOKEN || process.env.NOAA_TOKEN || '';
 
 // Middleware
 app.use(helmet());
@@ -891,6 +892,258 @@ app.get('/api/gis/fema-sea-level-rise/impact-analysis', async (req, res) => {
   }
 });
 
+// ===== NOAA CLIMATE DATA PROXY ENDPOINTS =====
+
+// Proxy to NOAA CDO API (requires token)
+// Example: /api/climate/noaa/cdo/datasets?limit=25
+app.get('/api/climate/noaa/cdo/*', async (req, res) => {
+  try {
+    if (!NOAA_CDO_TOKEN) {
+      return res.status(400).json({ success: false, error: 'NOAA_CDO_TOKEN is not configured' });
+    }
+
+    const cdoPath = req.params[0] || '';
+    const url = `https://www.ncei.noaa.gov/cdo-web/api/v2/${cdoPath}`;
+
+    const response = await axios.get(url, {
+      headers: { token: NOAA_CDO_TOKEN },
+      params: req.query,
+      timeout: 15000
+    });
+
+    res.json({ success: true, data: response.data });
+  } catch (error) {
+    const status = error.response?.status || 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// Lightweight helpers for common CDO resources
+app.get('/api/climate/noaa/datasets', async (req, res) => {
+  req.url = '/api/climate/noaa/cdo/datasets';
+  return app._router.handle(req, res, () => {});
+});
+
+app.get('/api/climate/noaa/stations', async (req, res) => {
+  req.url = '/api/climate/noaa/cdo/stations';
+  return app._router.handle(req, res, () => {});
+});
+
+app.get('/api/climate/noaa/data', async (req, res) => {
+  req.url = '/api/climate/noaa/cdo/data';
+  return app._router.handle(req, res, () => {});
+});
+
+// NOAA Sea Level Rise Viewer (unofficial) proxy
+// Passes through to coast.noaa.gov SLR API where available
+app.get('/api/climate/noaa/slr/*', async (req, res) => {
+  try {
+    const slrPath = req.params[0] || '';
+    const url = `https://coast.noaa.gov/slrdata/api/${slrPath}`;
+    const response = await axios.get(url, { params: req.query, timeout: 15000 });
+    res.json({ success: true, data: response.data });
+  } catch (error) {
+    const status = error.response?.status || 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// Computed series: Temperature anomaly (monthly) using GSOM
+// Defaults: station JFK (USW00094789), last 5 years (NOAA limit is 10 years)
+app.get('/api/climate/noaa/temperature/anomaly', async (req, res) => {
+  try {
+    if (!NOAA_CDO_TOKEN) {
+      return res.status(400).json({ success: false, error: 'NOAA_CDO_TOKEN is not configured' });
+    }
+
+    const stationid = req.query.stationid || 'GHCND:USW00094789';
+    const years = Math.min(parseInt(req.query.years || '5', 10), 9); // NOAA limit is 10 years, use 9 max
+    const now = new Date();
+    const enddate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const startdate = `${now.getFullYear() - years}-01-01`;
+
+    // Fetch monthly mean temperature (GSOM dataset, TAVG)
+    const url = 'https://www.ncei.noaa.gov/cdo-web/api/v2/data';
+    const params = {
+      datasetid: 'GSOM',
+      datatypeid: 'TAVG',
+      stationid,
+      startdate,
+      enddate,
+      limit: 1000,
+      units: 'metric'
+    };
+    const resp = await axios.get(url, { headers: { token: NOAA_CDO_TOKEN }, params, timeout: 20000 });
+    const results = resp.data?.results || [];
+
+    // TAVG is in tenths °C for GSOM; normalize to °C
+    const series = results
+      .map(r => ({ date: r.date, valueC: (typeof r.value === 'number' ? r.value : Number(r.value)) / 10 }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (series.length === 0) {
+      return res.json({ success: true, data: { stationid, timeseries: [], baselineMeanC: null, anomaliesC: [], trendCPerDecade: null } });
+    }
+
+    const mean = series.reduce((s, p) => s + p.valueC, 0) / series.length;
+    const anomalies = series.map(p => ({ date: p.date, valueC: p.valueC - mean }));
+
+    // Simple linear regression for anomaly trend
+    const xs = anomalies.map((p, i) => i);
+    const ys = anomalies.map(p => p.valueC);
+    const n = xs.length;
+    const sumX = xs.reduce((s, x) => s + x, 0);
+    const sumY = ys.reduce((s, y) => s + y, 0);
+    const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0);
+    const sumXX = xs.reduce((s, x) => s + x * x, 0);
+    const slopePerStep = (n * sumXY - sumX * sumY) / Math.max(1, (n * sumXX - sumX * sumX));
+    // steps are months; convert to per decade
+    const slopePerDecade = slopePerStep * 12 * 10;
+
+    res.json({
+      success: true,
+      data: {
+        stationid,
+        startdate,
+        enddate,
+        baselineMeanC: Number(mean.toFixed(3)),
+        timeseries: series.map(p => ({ date: p.date, valueC: Number(p.valueC.toFixed(3)) })),
+        anomaliesC: anomalies.map(p => ({ date: p.date, valueC: Number(p.valueC.toFixed(3)) })),
+        trendCPerDecade: Number(slopePerDecade.toFixed(3))
+      }
+    });
+  } catch (error) {
+    const status = error.response?.status || 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// Computed series: Precipitation trend (monthly) using GSOM PRCP
+app.get('/api/climate/noaa/precipitation/trend', async (req, res) => {
+  try {
+    if (!NOAA_CDO_TOKEN) {
+      return res.status(400).json({ success: false, error: 'NOAA_CDO_TOKEN is not configured' });
+    }
+
+    const stationid = req.query.stationid || 'GHCND:USW00094789';
+    const years = Math.min(parseInt(req.query.years || '5', 10), 9); // NOAA limit is 10 years, use 9 max
+    const now = new Date();
+    const enddate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const startdate = `${now.getFullYear() - years}-01-01`;
+
+    const url = 'https://www.ncei.noaa.gov/cdo-web/api/v2/data';
+    const params = {
+      datasetid: 'GSOM',
+      datatypeid: 'PRCP',
+      stationid,
+      startdate,
+      enddate,
+      limit: 1000,
+      units: 'metric'
+    };
+    const resp = await axios.get(url, { headers: { token: NOAA_CDO_TOKEN }, params, timeout: 20000 });
+    const results = resp.data?.results || [];
+
+    // PRCP unit from GSOM is tenths of mm; convert to mm
+    const series = results
+      .map(r => ({ date: r.date, valueMm: (typeof r.value === 'number' ? r.value : Number(r.value)) / 10 }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (series.length === 0) {
+      return res.json({ success: true, data: { stationid, timeseries: [], trendMmPerDecade: null } });
+    }
+
+    // Linear trend
+    const xs = series.map((p, i) => i);
+    const ys = series.map(p => p.valueMm);
+    const n = xs.length;
+    const sumX = xs.reduce((s, x) => s + x, 0);
+    const sumY = ys.reduce((s, y) => s + y, 0);
+    const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0);
+    const sumXX = xs.reduce((s, x) => s + x * x, 0);
+    const slopePerStep = (n * sumXY - sumX * sumY) / Math.max(1, (n * sumXX - sumX * sumX));
+    const slopePerDecade = slopePerStep * 12 * 10;
+
+    res.json({
+      success: true,
+      data: {
+        stationid,
+        startdate,
+        enddate,
+        timeseries: series.map(p => ({ date: p.date, valueMm: Number(p.valueMm.toFixed(2)) })),
+        trendMmPerDecade: Number(slopePerDecade.toFixed(2))
+      }
+    });
+  } catch (error) {
+    const status = error.response?.status || 500;
+    res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// NOAA Sea Level Rise endpoint
+app.get('/api/noaa/sea-level-rise', async (req, res) => {
+  try {
+    const { feet = 3, north, south, east, west } = req.query;
+
+    // Validate parameters
+    if (!north || !south || !east || !west) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bounding box coordinates required (north, south, east, west)'
+      });
+    }
+
+    // Map feet to NOAA service
+    const feetValue = parseInt(feet);
+    const serviceUrl = `https://coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${feetValue}ft/MapServer/0/query`;
+
+    console.log(`🌊 Fetching NOAA ${feetValue}ft sea level rise data...`);
+
+    // Build query parameters for NOAA ArcGIS
+    const params = {
+      f: 'geojson',
+      where: '1=1',
+      outFields: '*',
+      returnGeometry: 'true',
+      spatialRel: 'esriSpatialRelIntersects',
+      geometry: JSON.stringify({
+        xmin: parseFloat(west),
+        ymin: parseFloat(south),
+        xmax: parseFloat(east),
+        ymax: parseFloat(north),
+        spatialReference: { wkid: 4326 }
+      }),
+      geometryType: 'esriGeometryEnvelope',
+      inSR: '4326',
+      outSR: '4326'
+    };
+
+    const noaaResponse = await axios.get(serviceUrl, {
+      params,
+      timeout: 15000
+    });
+
+    console.log(`✅ NOAA returned ${noaaResponse.data.features?.length || 0} features`);
+
+    res.json({
+      success: true,
+      data: noaaResponse.data,
+      metadata: {
+        feet: feetValue,
+        bounds: { north, south, east, west },
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ NOAA fetch error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
 const startServer = async () => {
   await createUploadsDir();
@@ -906,6 +1159,7 @@ const startServer = async () => {
     console.log(`   - Municipal Open Data: /api/gis/municipal`);
     console.log(`   - Microsoft Buildings: /api/gis/microsoft-buildings`);
     console.log(`   - FEMA Sea Level Rise: /api/gis/fema-sea-level-rise`);
+    console.log(`🌊 NOAA Sea Level Rise endpoint: /api/noaa/sea-level-rise`);
   });
 };
 
