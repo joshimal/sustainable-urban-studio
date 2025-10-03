@@ -16,24 +16,31 @@ interface LayerPanelProps {
 }
 
 export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSettingsChange, seaLevelFeet = 0 }: LayerPanelProps) {
+  // Prevent mouse events from propagating to the map
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation()
+  }
   const [dataSource, setDataSource] = useState("NOAA")
-  const [seaLevelEnabled, setSeaLevelEnabled] = useState(true)
-  const [floodExposureEnabled, setFloodExposureEnabled] = useState(false)
-  const [landCoverEnabled, setLandCoverEnabled] = useState(false)
-  const [elevationEnabled, setElevationEnabled] = useState(false)
-  const [waterQualityEnabled, setWaterQualityEnabled] = useState(false)
+  const [selectedDataset, setSelectedDataset] = useState("sea_level_rise")
   const [datasetsExpanded, setDatasetsExpanded] = useState(true)
   const [seaLevelOpacity, setSeaLevelOpacity] = useState([60])
   const [size, setSize] = useState([8])
   const [temperatureThreshold, setTemperatureThreshold] = useState([3.2])
   const [borderWidth, setBorderWidth] = useState([1])
+  const [displayStyle, setDisplayStyle] = useState("depth") // "depth" or "extent"
+  const [showBorder, setShowBorder] = useState(true)  // Default to on
+  const [borderColor, setBorderColor] = useState("cyan")  // Light blue default
 
   // Notify parent component of layer settings changes
-  const updateLayerSettings = (enabled: boolean, opacity: number) => {
+  const updateLayerSettings = (settings: any) => {
     if (onLayerSettingsChange) {
       onLayerSettingsChange({
-        seaLevelEnabled: enabled,
-        seaLevelOpacity: opacity / 100
+        selectedDataset: settings.selectedDataset ?? selectedDataset,
+        seaLevelOpacity: (settings.opacity ?? seaLevelOpacity[0]) / 100,
+        displayStyle: settings.displayStyle ?? displayStyle,
+        showBorder: settings.showBorder ?? showBorder,
+        borderColor: settings.borderColor ?? borderColor,
+        borderWidth: settings.borderWidth ?? borderWidth[0]
       })
     }
   }
@@ -71,7 +78,11 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
   const layerConfig = getLayerConfig()
 
   return (
-    <div className="w-80 bg-card border-l border-gray-700 flex flex-col">
+    <div
+      className="w-80 bg-card border-l border-gray-700 flex flex-col"
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleMouseDown}
+    >
       {/* Header */}
       <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between mb-4">
@@ -116,11 +127,12 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
             <div className="ml-6 mt-2 space-y-2">
               <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
                 <input
-                  type="checkbox"
-                  checked={seaLevelEnabled}
-                  onChange={(e) => {
-                    setSeaLevelEnabled(e.target.checked)
-                    updateLayerSettings(e.target.checked, seaLevelOpacity[0])
+                  type="radio"
+                  name="dataset"
+                  checked={selectedDataset === "sea_level_rise"}
+                  onChange={() => {
+                    setSelectedDataset("sea_level_rise")
+                    updateLayerSettings({ selectedDataset: "sea_level_rise" })
                   }}
                   className="w-4 h-4 cursor-pointer"
                 />
@@ -129,9 +141,13 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
 
               <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
                 <input
-                  type="checkbox"
-                  checked={floodExposureEnabled}
-                  onChange={(e) => setFloodExposureEnabled(e.target.checked)}
+                  type="radio"
+                  name="dataset"
+                  checked={selectedDataset === "flood_exposure"}
+                  onChange={() => {
+                    setSelectedDataset("flood_exposure")
+                    updateLayerSettings({ selectedDataset: "flood_exposure" })
+                  }}
                   className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-sm">Flood Exposure</span>
@@ -139,9 +155,13 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
 
               <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
                 <input
-                  type="checkbox"
-                  checked={landCoverEnabled}
-                  onChange={(e) => setLandCoverEnabled(e.target.checked)}
+                  type="radio"
+                  name="dataset"
+                  checked={selectedDataset === "land_cover"}
+                  onChange={() => {
+                    setSelectedDataset("land_cover")
+                    updateLayerSettings({ selectedDataset: "land_cover" })
+                  }}
                   className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-sm">Land Cover</span>
@@ -149,9 +169,13 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
 
               <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
                 <input
-                  type="checkbox"
-                  checked={elevationEnabled}
-                  onChange={(e) => setElevationEnabled(e.target.checked)}
+                  type="radio"
+                  name="dataset"
+                  checked={selectedDataset === "elevation"}
+                  onChange={() => {
+                    setSelectedDataset("elevation")
+                    updateLayerSettings({ selectedDataset: "elevation" })
+                  }}
                   className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-sm">Elevation</span>
@@ -159,9 +183,13 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
 
               <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
                 <input
-                  type="checkbox"
-                  checked={waterQualityEnabled}
-                  onChange={(e) => setWaterQualityEnabled(e.target.checked)}
+                  type="radio"
+                  name="dataset"
+                  checked={selectedDataset === "water_quality"}
+                  onChange={() => {
+                    setSelectedDataset("water_quality")
+                    updateLayerSettings({ selectedDataset: "water_quality" })
+                  }}
                   className="w-4 h-4 cursor-pointer"
                 />
                 <span className="text-sm">Water Quality</span>
@@ -185,8 +213,8 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
           </TabsList>
 
           <TabsContent value="controls" className="py-4 space-y-6">
-            {/* Sea Level Rise Slider - only show for sea level rise layer AND when enabled */}
-            {selectedLayer === "noaa_sea_level_rise" && seaLevelEnabled && (
+            {/* Sea Level Rise Slider - only show for sea level rise dataset */}
+            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
               <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/30">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-sm font-medium">🌊 Sea Level Rise</label>
@@ -201,72 +229,52 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
                       }
                     }}
                     min={0}
-                    max={10}
+                    max={6}
                     step={1}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>0ft</span>
-                    <span>5ft</span>
-                    <span>10ft</span>
+                    <span>3ft</span>
+                    <span>6ft</span>
                   </div>
                   <div className="text-xs text-blue-300 mt-2">
                     {seaLevelFeet === 0 && "Baseline (Current)"}
                     {seaLevelFeet === 1 && "Low (~2050)"}
-                    {seaLevelFeet > 1 && seaLevelFeet <= 3 && "Intermediate (~2100)"}
-                    {seaLevelFeet > 3 && seaLevelFeet <= 6 && "High (~2100)"}
-                    {seaLevelFeet > 6 && "Planning Scenario"}
+                    {seaLevelFeet === 2 && "Intermediate-Low (~2070)"}
+                    {seaLevelFeet === 3 && "Intermediate (~2100)"}
+                    {seaLevelFeet === 4 && "Intermediate-High (~2100)"}
+                    {seaLevelFeet === 5 && "High (~2100)"}
+                    {seaLevelFeet === 6 && "Extreme (~2150)"}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Display Style */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-medium">Display style</label>
-                <Button variant="ghost" size="sm" className="p-1">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </div>
-              <Select value={layerConfig.displayStyle}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="heatmap">Heatmap</SelectItem>
-                  <SelectItem value="points">Points</SelectItem>
-                  <SelectItem value="polygon">Polygon</SelectItem>
-                  <SelectItem value="clusters">Clusters</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Color Scale */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-medium">Color scale</label>
-                <label className="text-sm font-medium">Density threshold</label>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <div className={`h-2 bg-gradient-to-r ${layerConfig.colorScale} rounded`}></div>
+            {/* Display Style - Only show for sea level rise */}
+            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-medium">Display style</label>
                 </div>
-                <Select defaultValue="128">
-                  <SelectTrigger className="w-20">
+                <Select value={displayStyle} onValueChange={(value) => {
+                  setDisplayStyle(value)
+                  updateLayerSettings({ displayStyle: value })
+                }}>
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="64">64</SelectItem>
-                    <SelectItem value="128">128</SelectItem>
-                    <SelectItem value="256">256</SelectItem>
+                    <SelectItem value="depth">Depth (Layer 1)</SelectItem>
+                    <SelectItem value="extent">Extent Only (Layer 0)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            )}
+
 
             {/* Opacity Control for Sea Level Rise */}
-            {selectedLayer === "noaa_sea_level_rise" && seaLevelEnabled && (
+            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
                 <div className="space-y-2">
@@ -274,7 +282,7 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
                     value={seaLevelOpacity}
                     onValueChange={(value) => {
                       setSeaLevelOpacity(value)
-                      updateLayerSettings(seaLevelEnabled, value[0])
+                      updateLayerSettings({ opacity: value[0] })
                     }}
                     max={100}
                     step={1}
@@ -285,55 +293,64 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
               </div>
             )}
 
-            <Separator />
+            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
+              <>
+                <Separator />
 
-            {/* Border */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-sm font-medium">Border</label>
-                <Button variant="ghost" size="sm" className="p-1">
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Border color</label>
-                    <Select defaultValue="select">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="select">Select</SelectItem>
-                        <SelectItem value="black">Black</SelectItem>
-                        <SelectItem value="white">White</SelectItem>
-                      </SelectContent>
-                    </Select>
+                {/* Border */}
+                <div className="mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      checked={showBorder}
+                      onChange={(e) => {
+                        setShowBorder(e.target.checked)
+                        updateLayerSettings({ showBorder: e.target.checked })
+                      }}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <label className="text-sm font-medium">Show Border</label>
                   </div>
 
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Color offset</label>
-                    <Select defaultValue="3">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1</SelectItem>
-                        <SelectItem value="2">2</SelectItem>
-                        <SelectItem value="3">3</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                  {showBorder && (
+                    <div className="space-y-3 ml-6">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">Border color</label>
+                        <Select value={borderColor} onValueChange={(value) => {
+                          setBorderColor(value)
+                          updateLayerSettings({ borderColor: value })
+                        }}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cyan">Light Blue (Cyan)</SelectItem>
+                            <SelectItem value="white">White</SelectItem>
+                            <SelectItem value="black">Black</SelectItem>
+                            <SelectItem value="yellow">Yellow</SelectItem>
+                            <SelectItem value="red">Red</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                <div>
-                  <label className="text-xs text-muted-foreground mb-2 block">Width</label>
-                  <Slider value={borderWidth} onValueChange={setBorderWidth} max={10} step={1} className="w-full" />
-                  <span className="text-xs text-muted-foreground mt-1">{borderWidth[0]}px</span>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-2 block">Width: {borderWidth[0]}px</label>
+                        <Slider
+                          value={borderWidth}
+                          onValueChange={(value) => {
+                            setBorderWidth(value)
+                            updateLayerSettings({ borderWidth: value[0] })
+                          }}
+                          max={5}
+                          step={1}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
           </TabsContent>
 

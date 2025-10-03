@@ -97,3 +97,24 @@
     overflow: hidden;
   }
 }
+/* Leaflet map dragging support */
+.leaflet-container {
+  cursor: grab;
+}
+
+.leaflet-grab {
+  cursor: grab;
+}
+
+.leaflet-dragging .leaflet-container,
+.leaflet-dragging .leaflet-grab {
+  cursor: grabbing !important;
+}
+
+.leaflet-interactive {
+  cursor: pointer;
+}
+
+.leaflet-container a {
+  cursor: pointer;
+}

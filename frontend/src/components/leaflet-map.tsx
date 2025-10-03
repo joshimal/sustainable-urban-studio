@@ -12,71 +12,74 @@ interface LeafletMapProps {
   layerSettings?: {
     seaLevelEnabled: boolean
     seaLevelOpacity: number
+    displayStyle?: string
+    colorScheme?: string
+    showBorder?: boolean
+    borderColor?: string
+    borderWidth?: number
   }
 }
 
 export function LeafletMap({ className, seaLevelRiseData, layerSettings, seaLevelFeet = 2 }: LeafletMapProps) {
-  console.log('LeafletMap component rendering...')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const mapInstanceRef = useRef<any>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const geoJsonLayerRef = useRef<any>(null)
+  const climateLayerRef = useRef<any>(null)
 
   // Track when component is mounted and ref is ready
   useEffect(() => {
-    console.log('Component mounted, setting isMounted to true')
     setIsMounted(true)
   }, [])
 
   useEffect(() => {
     if (!isMounted) {
-      console.log('Component not mounted yet, skipping map init')
       return
     }
-
-    console.log('LeafletMap useEffect running, isMounted:', isMounted)
 
     let isComponentMounted = true
     let timeoutId: NodeJS.Timeout
 
     const initMap = async () => {
       try {
-        console.log('Starting map initialization...')
-        console.log('Dynamically importing Leaflet ESM')
-
         // Wait for container to be available
         let attempts = 0
         const maxAttempts = 50
-        
+
         while (!mapRef.current && attempts < maxAttempts) {
-          console.log(`Waiting for container, attempt ${attempts + 1}/${maxAttempts}, mapRef.current:`, mapRef.current)
           await new Promise(resolve => setTimeout(resolve, 50))
           attempts++
         }
 
         if (!mapRef.current) {
-          console.error('Map container not found after waiting')
           if (isComponentMounted) {
             setError("Map container not found after waiting")
           }
           return
         }
 
-        console.log('Container found, creating map...')
         // Dynamically import Leaflet ESM build
         const L = await import('leaflet/dist/leaflet-src.esm.js')
 
-        // Create map
+        // Create map with interaction handlers
         const leafletMap = L.map(mapRef.current as any, {
           center: [40.7589, -73.9851], // Nassau County
           zoom: 10,
           zoomControl: true,
-          attributionControl: true
+          attributionControl: true,
+          dragging: true,
+          touchZoom: true,
+          scrollWheelZoom: true,
+          doubleClickZoom: true,
+          boxZoom: true,
+          keyboard: true,
+          inertia: true,
+          worldCopyJump: false,
+          zoomAnimation: true
         })
 
-        console.log('Map created, adding tile layer...')
         // Add dark tile layer
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
           attribution: '© CartoDB',
@@ -84,12 +87,10 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings, seaLeve
           maxZoom: 19
         }).addTo(leafletMap)
 
-        console.log('Adding marker...')
         // Add a simple marker to test
         L.marker([40.7589, -73.9851]).addTo(leafletMap)
           .bindPopup('Nassau County, NY')
 
-        console.log('Map initialization complete!')
         if (isComponentMounted) {
           mapInstanceRef.current = leafletMap
           setIsLoading(false)
@@ -99,26 +100,16 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings, seaLeve
         console.error('Map initialization error:', err)
         if (isComponentMounted) {
           setError(err instanceof Error ? err.message : 'Failed to load map')
-        setIsLoading(false)
+          setIsLoading(false)
         }
       }
     }
-
-    // Set a timeout to prevent infinite loading
-    timeoutId = setTimeout(() => {
-      if (isComponentMounted && isLoading) {
-        console.error('Map initialization timeout')
-        setError("Map initialization timeout")
-        setIsLoading(false)
-      }
-    }, 5000) // 5 second timeout
 
     // Start initialization immediately
     initMap()
 
     return () => {
       isComponentMounted = false
-      clearTimeout(timeoutId)
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
@@ -140,45 +131,58 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings, seaLeve
           geoJsonLayerRef.current = null
         }
 
-        // Add NOAA tile layer if enabled
-        if (layerSettings?.seaLevelEnabled) {
+        // Add NOAA tile layer if sea level rise is selected
+        if (layerSettings?.selectedDataset === 'sea_level_rise') {
           const opacity = layerSettings?.seaLevelOpacity ?? 0.6
 
-          console.log(`Adding NOAA ${seaLevelFeet}ft depth layer, opacity:`, opacity)
+          console.log(`Loading NOAA tiles for ${seaLevelFeet}ft`)
 
-          // Create a custom tile layer for ArcGIS export endpoint
-          const ArcGISTileLayer = (L as any).TileLayer.extend({
-            getTileUrl: function(coords: any) {
-              const map = mapInstanceRef.current
-              const tileSize = this.getTileSize()
-              const nwPoint = coords.scaleBy(tileSize)
-              const sePoint = nwPoint.add(tileSize)
-
-              const nw = map.unproject(nwPoint, coords.z)
-              const se = map.unproject(sePoint, coords.z)
-
-              // Convert to Web Mercator coordinates
-              const nwMerc = (L as any).Projection.SphericalMercator.project(nw)
-              const seMerc = (L as any).Projection.SphericalMercator.project(se)
-
-              const bbox = `${nwMerc.x},${seMerc.y},${seMerc.x},${nwMerc.y}`
-
-              return `https://coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${seaLevelFeet}ft/MapServer/export?` +
-                `bbox=${bbox}&` +
-                `bboxSR=3857&` +
-                `layers=show:1&` +
-                `size=256,256&` +
-                `imageSR=3857&` +
-                `format=png&` +
-                `transparent=true&` +
-                `f=image`
+          // Use NOAA's cached tile service directly (works for all feet values)
+          // Add cache buster to force reload
+          const tileLayer = L.tileLayer(
+            `https://www.coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${seaLevelFeet}ft/MapServer/tile/{z}/{y}/{x}?v=${Date.now()}`,
+            {
+              opacity: opacity,
+              attribution: '© NOAA Office for Coastal Management',
+              className: 'noaa-sea-level-layer',
+              maxZoom: 16,  // Tiles cached down to level 16
+              updateWhenZooming: false,
+              updateWhenIdle: true,
+              keepBuffer: 2
             }
-          })
+          )
 
-          geoJsonLayerRef.current = new ArcGISTileLayer('', {
-            opacity: opacity,
-            attribution: '© NOAA Office for Coastal Management'
-          }).addTo(mapInstanceRef.current)
+          geoJsonLayerRef.current = tileLayer.addTo(mapInstanceRef.current)
+
+          // Apply color adjustment and border effect using CSS filters
+          const showBorder = layerSettings?.showBorder ?? true
+          const borderColor = layerSettings?.borderColor ?? 'cyan'
+          const borderWidth = layerSettings?.borderWidth ?? 1
+
+          setTimeout(() => {
+            const pane = mapInstanceRef.current.getPane('tilePane')
+            const layers = pane?.querySelectorAll('.noaa-sea-level-layer')
+            layers?.forEach((layer: any) => {
+              // Color adjustment: shift bright blue to #123B5F
+              // brightness(0.6) - darken, saturate(0.7) - less saturated, hue-rotate(5deg) - slight hue shift
+              let filters = 'brightness(0.6) saturate(0.7) hue-rotate(5deg)'
+
+              // Add border effect if enabled
+              if (showBorder) {
+                const colorMap: any = {
+                  'cyan': '0, 255, 255',
+                  'white': '255, 255, 255',
+                  'black': '0, 0, 0',
+                  'yellow': '255, 255, 0',
+                  'red': '255, 0, 0'
+                }
+                const rgb = colorMap[borderColor] || '0, 255, 255'
+                filters += ` drop-shadow(0 0 ${borderWidth}px rgba(${rgb}, 0.8)) drop-shadow(0 0 ${borderWidth}px rgba(${rgb}, 0.8))`
+              }
+
+              layer.style.filter = filters
+            })
+          }, 100)
         }
       } catch (err) {
         console.error('Error adding sea level rise layer:', err)
@@ -186,20 +190,24 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings, seaLeve
     }
 
     addSeaLevelLayer()
-  }, [seaLevelFeet, layerSettings?.seaLevelOpacity, layerSettings?.seaLevelEnabled])
-
-  console.log('LeafletMap rendering return statement, mapRef.current:', mapRef.current)
+  }, [seaLevelFeet, layerSettings?.seaLevelOpacity, layerSettings?.selectedDataset, layerSettings?.displayStyle, layerSettings?.showBorder, layerSettings?.borderColor, layerSettings?.borderWidth])
 
   return (
     <div className={`relative h-full ${className}`}>
       <div
         ref={mapRef}
         className="absolute inset-0"
-        style={{ backgroundColor: '#1a1a1a' }}
+        style={{
+          backgroundColor: '#1a1a1a',
+          cursor: 'grab',
+          touchAction: 'none',
+          userSelect: 'none',
+          zIndex: 0
+        }}
       />
 
       {isLoading && (
-        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+        <div className="absolute inset-0 grid place-items-center pointer-events-none" style={{ zIndex: 10 }}>
           <div className="text-white text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p>Loading map...</p>
@@ -208,7 +216,7 @@ export function LeafletMap({ className, seaLevelRiseData, layerSettings, seaLeve
       )}
 
       {error && (
-        <div className="absolute inset-0 grid place-items-center">
+        <div className="absolute inset-0 grid place-items-center pointer-events-auto" style={{ zIndex: 10 }}>
           <div className="text-white text-center bg-red-900/70 px-4 py-3 rounded">
             <p className="text-red-300 mb-2">Map Error</p>
             <p className="text-sm">{error}</p>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
-import { Layers, Search, ZoomIn, ZoomOut, Maximize2, Map, Plus, X, Trash2 } from "lucide-react"
+import { Layers, Search, Map, Plus, X, Trash2 } from "lucide-react"
 import { LayerPanel } from "./layer-panel"
 import { LeafletMap } from "./leaflet-map"
 
@@ -11,12 +11,16 @@ export function GISAnalysisApp() {
   const [selectedLayer, setSelectedLayer] = useState("noaa_sea_level_rise")
   const [layerPanelOpen, setLayerPanelOpen] = useState(true)
   const [seaLevelRiseData, setSeaLevelRiseData] = useState(null)
-  const [seaLevelFeet, setSeaLevelFeet] = useState(0)
+  const [seaLevelFeet, setSeaLevelFeet] = useState(0)  // Start at 0ft to show current water baseline
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [mapName, setMapName] = useState("")
   const [layerSettings, setLayerSettings] = useState({
-    seaLevelEnabled: true,
-    seaLevelOpacity: 0.6
+    selectedDataset: 'sea_level_rise',
+    seaLevelOpacity: 0.6,
+    displayStyle: 'depth',
+    showBorder: true,  // Enable border by default
+    borderColor: 'cyan',  // Light blue border
+    borderWidth: 1
   })
   const [selectedMapId, setSelectedMapId] = useState<string | null>("1")
   const [projects, setProjects] = useState([
@@ -226,21 +230,8 @@ export function GISAnalysisApp() {
             seaLevelFeet={seaLevelFeet}
           />
 
-          {/* Map Controls */}
-          <div className="absolute top-4 right-4 flex flex-col gap-2">
-            <Button size="sm" variant="secondary" className="p-2">
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="secondary" className="p-2">
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="secondary" className="p-2">
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          </div>
-
           {/* Control Buttons */}
-          <div className="absolute top-4 left-4 flex gap-2">
+          <div className="absolute top-4 right-4 flex gap-2 z-[1000] pointer-events-auto">
             <Button
               variant="secondary"
               size="sm"
