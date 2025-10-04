@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Layers, Search, Map, Plus, X, Trash2 } from "lucide-react"
@@ -11,6 +11,8 @@ export function GISAnalysisApp() {
   const [selectedLayer, setSelectedLayer] = useState("noaa_sea_level_rise")
   const [layerPanelOpen, setLayerPanelOpen] = useState(true)
   const [seaLevelRiseData, setSeaLevelRiseData] = useState(null)
+  const [temperatureData, setTemperatureData] = useState(null)
+  const [urbanHeatData, setUrbanHeatData] = useState(null)
   const [seaLevelFeet, setSeaLevelFeet] = useState(0)  // Start at 0ft to show current water baseline
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [mapName, setMapName] = useState("")
@@ -20,7 +22,9 @@ export function GISAnalysisApp() {
     displayStyle: 'depth',
     showBorder: true,  // Enable border by default
     borderColor: 'cyan',  // Light blue border
-    borderWidth: 1
+    borderWidth: 1,
+    temperatureThreshold: 3.2,
+    urbanHeatOpacity: 0.2  // Urban Heat Island starts at 20%
   })
   const [selectedMapId, setSelectedMapId] = useState<string | null>("1")
   const [projects, setProjects] = useState([
@@ -134,18 +138,100 @@ export function GISAnalysisApp() {
     }
   };
 
+  // Fetch NASA GISTEMP Temperature data
+  const fetchTemperatureData = async () => {
+    try {
+      console.log('🌡️ Fetching NASA GISTEMP temperature data...', {
+        selectedDataset: layerSettings.selectedDataset
+      });
+
+      // Get global bounds for temperature data
+      const bounds = {
+        north: 90,
+        south: -90,
+        east: 180,
+        west: -180
+      };
+
+      const response = await fetch(
+        `http://localhost:3001/api/nasa/temperature?` +
+        `north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}&resolution=1`
+      );
+
+      const result = await response.json();
+      console.log('✅ Temperature data loaded:', result.data.features.length, 'grid cells');
+      setTemperatureData(result.data);
+    } catch (error) {
+      console.error('❌ Error fetching NASA temperature data:', error);
+    }
+  };
+
+  // Fetch REAL NASA MODIS LST data for Urban Heat Island
+  const fetchModisLSTData = async () => {
+    try {
+      console.log('🛰️ Fetching REAL NASA MODIS LST data...');
+
+      // Nassau County bounding box (extended slightly for better coverage)
+      const bounds = {
+        north: 40.90,
+        south: 40.55,
+        east: -73.35,
+        west: -73.80
+      };
+
+      // Use recent historical date (NASA POWER data is ~1 week delayed)
+      const recentDate = new Date();
+      recentDate.setDate(recentDate.getDate() - 7); // 7 days ago
+      const dateStr = recentDate.toISOString().split('T')[0].replace(/-/g, '');
+
+      const response = await fetch(
+        `http://localhost:3001/api/modis/lst?` +
+        `north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}&resolution=0.05&date=${dateStr}`
+      );
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setUrbanHeatData(result.data);
+        console.log(`✅ MODIS LST data loaded: ${result.data.features.length} points`);
+        console.log(`📊 Data source: ${result.data.properties.source}`);
+        console.log(`🌡️ Reference temp: ${result.data.properties.reference_temp}°C`);
+      } else {
+        console.error('❌ Failed to load MODIS data:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching MODIS LST data:', error);
+    }
+  };
+
   // Handle sea level change from slider
   const handleSeaLevelChange = (feet: number) => {
     setSeaLevelFeet(feet);
     fetchSeaLevelRiseData(feet);
   };
 
-  // Load initial sea level rise data
+  // Load initial data based on selected dataset
   useEffect(() => {
-    if (selectedLayer === "noaa_sea_level_rise") {
+    console.log('🔄 Dataset changed:', {
+      selectedLayer,
+      selectedDataset: layerSettings.selectedDataset
+    });
+
+    if (selectedLayer === "noaa_sea_level_rise" && layerSettings.selectedDataset === "sea_level_rise") {
       fetchSeaLevelRiseData(seaLevelFeet);
+    } else if (layerSettings.selectedDataset === "temperature") {
+      console.log('📡 Triggering temperature fetch');
+      fetchTemperatureData();
+    } else if (layerSettings.selectedDataset === "urban_heat_island") {
+      console.log('🏙️ Loading Urban Heat Island layer with REAL NASA MODIS LST data');
+      fetchModisLSTData();
     }
-  }, [selectedLayer]);
+  }, [selectedLayer, layerSettings.selectedDataset]);
+
+  // Debug: Log layerSettings changes
+  useEffect(() => {
+    console.log('⚙️ Layer settings updated:', layerSettings);
+  }, [layerSettings]);
 
   return (
     <div className="h-screen bg-background text-foreground flex">
@@ -225,7 +311,9 @@ export function GISAnalysisApp() {
         {/* Map View */}
         <div className="flex-1 relative">
           <LeafletMap
-            seaLevelRiseData={layerSettings.seaLevelEnabled ? seaLevelRiseData : null}
+            seaLevelRiseData={layerSettings.selectedDataset === 'sea_level_rise' ? seaLevelRiseData : null}
+            temperatureData={layerSettings.selectedDataset === 'temperature' ? temperatureData : null}
+            urbanHeatData={layerSettings.selectedDataset === 'urban_heat_island' ? urbanHeatData : null}
             layerSettings={layerSettings}
             seaLevelFeet={seaLevelFeet}
           />

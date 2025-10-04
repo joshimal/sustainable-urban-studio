@@ -23,9 +23,21 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
   const [dataSource, setDataSource] = useState("NOAA")
   const [selectedDataset, setSelectedDataset] = useState("sea_level_rise")
   const [datasetsExpanded, setDatasetsExpanded] = useState(true)
+  const [enabledLayers, setEnabledLayers] = useState<string[]>(["sea_level_rise"])
+  const [layerOrder, setLayerOrder] = useState<string[]>([
+    "sea_level_rise",
+    "flood_exposure",
+    "land_cover",
+    "elevation",
+    "water_quality",
+    "temperature",
+    "urban_heat_island"
+  ])
+  const [draggedLayer, setDraggedLayer] = useState<string | null>(null)
   const [seaLevelOpacity, setSeaLevelOpacity] = useState([60])
+  const [urbanHeatOpacity, setUrbanHeatOpacity] = useState([20])  // Urban Heat Island starts at 20%
   const [size, setSize] = useState([8])
-  const [temperatureThreshold, setTemperatureThreshold] = useState([3.2])
+  const [temperatureThreshold, setTemperatureThreshold] = useState([0])  // Start at 0°C to show all data
   const [borderWidth, setBorderWidth] = useState([1])
   const [displayStyle, setDisplayStyle] = useState("depth") // "depth" or "extent"
   const [showBorder, setShowBorder] = useState(true)  // Default to on
@@ -36,13 +48,72 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
     if (onLayerSettingsChange) {
       onLayerSettingsChange({
         selectedDataset: settings.selectedDataset ?? selectedDataset,
+        enabledLayers: settings.enabledLayers ?? enabledLayers,
+        layerOrder: settings.layerOrder ?? layerOrder,
         seaLevelOpacity: (settings.opacity ?? seaLevelOpacity[0]) / 100,
+        urbanHeatOpacity: (settings.urbanHeatOpacity ?? urbanHeatOpacity[0]) / 100,
         displayStyle: settings.displayStyle ?? displayStyle,
         showBorder: settings.showBorder ?? showBorder,
         borderColor: settings.borderColor ?? borderColor,
-        borderWidth: settings.borderWidth ?? borderWidth[0]
+        borderWidth: settings.borderWidth ?? borderWidth[0],
+        temperatureThreshold: settings.temperatureThreshold ?? temperatureThreshold[0]
       })
     }
+  }
+
+  const toggleLayer = (layerId: string) => {
+    const newEnabledLayers = enabledLayers.includes(layerId)
+      ? enabledLayers.filter(id => id !== layerId)
+      : [...enabledLayers, layerId]
+
+    setEnabledLayers(newEnabledLayers)
+
+    // Set as active dataset if enabling
+    if (!enabledLayers.includes(layerId)) {
+      setSelectedDataset(layerId)
+      updateLayerSettings({
+        selectedDataset: layerId,
+        enabledLayers: newEnabledLayers
+      })
+    } else {
+      updateLayerSettings({ enabledLayers: newEnabledLayers })
+    }
+  }
+
+  const handleDragStart = (layerId: string) => {
+    setDraggedLayer(layerId)
+  }
+
+  const handleDragOver = (e: React.DragEvent, targetLayerId: string) => {
+    e.preventDefault()
+    if (!draggedLayer || draggedLayer === targetLayerId) return
+
+    const newOrder = [...layerOrder]
+    const draggedIndex = newOrder.indexOf(draggedLayer)
+    const targetIndex = newOrder.indexOf(targetLayerId)
+
+    newOrder.splice(draggedIndex, 1)
+    newOrder.splice(targetIndex, 0, draggedLayer)
+
+    setLayerOrder(newOrder)
+    updateLayerSettings({ layerOrder: newOrder })
+  }
+
+  const handleDragEnd = () => {
+    setDraggedLayer(null)
+  }
+
+  const getLayerName = (layerId: string): string => {
+    const names: { [key: string]: string } = {
+      sea_level_rise: "Sea Level Rise",
+      flood_exposure: "Flood Exposure",
+      land_cover: "Land Cover",
+      elevation: "Elevation",
+      water_quality: "Water Quality",
+      temperature: "Surface Temperature (NASA GISTEMP)",
+      urban_heat_island: "Urban Heat Island (NASA MODIS LST)"
+    }
+    return names[layerId] || layerId
   }
 
 
@@ -124,76 +195,46 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
           </div>
 
           {datasetsExpanded && (
-            <div className="ml-6 mt-2 space-y-2">
-              <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
-                <input
-                  type="radio"
-                  name="dataset"
-                  checked={selectedDataset === "sea_level_rise"}
-                  onChange={() => {
-                    setSelectedDataset("sea_level_rise")
-                    updateLayerSettings({ selectedDataset: "sea_level_rise" })
-                  }}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <span className="text-sm">Sea Level Rise</span>
+            <div className="ml-2 mt-2 space-y-1">
+              <div className="text-xs text-muted-foreground mb-2 px-2">
+                Check layers to enable • Drag to reorder
               </div>
-
-              <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
-                <input
-                  type="radio"
-                  name="dataset"
-                  checked={selectedDataset === "flood_exposure"}
-                  onChange={() => {
-                    setSelectedDataset("flood_exposure")
-                    updateLayerSettings({ selectedDataset: "flood_exposure" })
+              {layerOrder.map((layerId) => (
+                <div
+                  key={layerId}
+                  draggable
+                  onDragStart={() => handleDragStart(layerId)}
+                  onDragOver={(e) => handleDragOver(e, layerId)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => {
+                    if (enabledLayers.includes(layerId)) {
+                      setSelectedDataset(layerId)
+                      updateLayerSettings({ selectedDataset: layerId })
+                    }
                   }}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <span className="text-sm">Flood Exposure</span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
-                <input
-                  type="radio"
-                  name="dataset"
-                  checked={selectedDataset === "land_cover"}
-                  onChange={() => {
-                    setSelectedDataset("land_cover")
-                    updateLayerSettings({ selectedDataset: "land_cover" })
-                  }}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <span className="text-sm">Land Cover</span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
-                <input
-                  type="radio"
-                  name="dataset"
-                  checked={selectedDataset === "elevation"}
-                  onChange={() => {
-                    setSelectedDataset("elevation")
-                    updateLayerSettings({ selectedDataset: "elevation" })
-                  }}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <span className="text-sm">Elevation</span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50">
-                <input
-                  type="radio"
-                  name="dataset"
-                  checked={selectedDataset === "water_quality"}
-                  onChange={() => {
-                    setSelectedDataset("water_quality")
-                    updateLayerSettings({ selectedDataset: "water_quality" })
-                  }}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <span className="text-sm">Water Quality</span>
-              </div>
+                  className={`flex items-center gap-2 p-2 rounded cursor-move hover:bg-gray-800/50 ${
+                    selectedDataset === layerId && enabledLayers.includes(layerId)
+                      ? 'bg-blue-500/20 border border-blue-500/50'
+                      : ''
+                  } ${draggedLayer === layerId ? 'opacity-50' : ''}`}
+                >
+                  <span className="text-gray-500 text-xs">⋮⋮</span>
+                  <input
+                    type="checkbox"
+                    checked={enabledLayers.includes(layerId)}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      toggleLayer(layerId)
+                      console.log(`🔲 Layer "${layerId}" ${enabledLayers.includes(layerId) ? 'disabled' : 'enabled'}`)
+                    }}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-sm flex-1">{getLayerName(layerId)}</span>
+                  {enabledLayers.includes(layerId) && (
+                    <span className="text-xs text-green-400">●</span>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -291,6 +332,146 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
                   <span className="text-xs text-muted-foreground">{seaLevelOpacity[0]}%</span>
                 </div>
               </div>
+            )}
+
+            {/* Temperature Controls - only show for temperature dataset */}
+            {selectedDataset === "temperature" && (
+              <div className="bg-red-500/10 p-4 rounded-lg border border-red-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-medium">🌡️ Temperature Anomaly Filter</label>
+                  <span className="text-lg font-bold text-red-400">
+                    {temperatureThreshold[0] === 0 ? 'All' : `≥${temperatureThreshold[0]}°C`}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <Slider
+                    value={temperatureThreshold}
+                    onValueChange={(value) => {
+                      setTemperatureThreshold(value)
+                      updateLayerSettings({ temperatureThreshold: value[0] })
+                    }}
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0°C (All)</span>
+                    <span>2.5°C</span>
+                    <span>5°C</span>
+                  </div>
+                  <div className="text-xs text-red-300 mt-2">
+                    NASA GISTEMP global surface temperature anomaly relative to 1951-1980 average. Heatmap shows all warming globally.
+                  </div>
+                </div>
+
+                {/* Layer Opacity */}
+                <div className="mt-4">
+                  <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
+                  <div className="space-y-2">
+                    <Slider
+                      value={seaLevelOpacity}
+                      onValueChange={(value) => {
+                        setSeaLevelOpacity(value)
+                        updateLayerSettings({ opacity: value[0] })
+                      }}
+                      max={100}
+                      step={1}
+                      className="w-full"
+                    />
+                    <span className="text-xs text-muted-foreground">{seaLevelOpacity[0]}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Urban Heat Island Controls - only show for urban_heat_island dataset */}
+            {selectedDataset === "urban_heat_island" && (
+              <>
+                <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium">🛰️ Land Surface Temperature</label>
+                  </div>
+                  <div className="text-xs text-green-300 mb-2">
+                    <strong>✅ REAL SATELLITE DATA</strong> - NASA MODIS LST
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-4">
+                    Using NASA POWER API for satellite-derived land surface temperature
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Layer Opacity */}
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
+                      <div className="space-y-2">
+                        <Slider
+                          value={urbanHeatOpacity}
+                          onValueChange={(value) => {
+                            setUrbanHeatOpacity(value)
+                            updateLayerSettings({ urbanHeatOpacity: value[0] })
+                          }}
+                          max={100}
+                          step={1}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-muted-foreground">{urbanHeatOpacity[0]}%</span>
+                      </div>
+                    </div>
+
+                    {/* Temperature Range Legend */}
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Temperature Scale</label>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-[#2166ac] rounded"></div>
+                          <span className="text-muted-foreground">Coolest (Blue)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-[#92c5de] rounded"></div>
+                          <span className="text-muted-foreground">Cool (Cyan)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-[#fddbca] rounded"></div>
+                          <span className="text-muted-foreground">Moderate (Beige)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-[#f4a582] rounded"></div>
+                          <span className="text-muted-foreground">Warm (Orange)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-[#b2182b] rounded"></div>
+                          <span className="text-muted-foreground">Hottest (Red)</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-2 italic">
+                          * Range varies by location and season
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Show Hotspots Toggle */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        defaultChecked={true}
+                        onChange={(e) => {
+                          updateLayerSettings({ showHotspots: e.target.checked })
+                        }}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <label className="text-sm font-medium">Show Heat Island Hotspots</label>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="text-xs text-muted-foreground space-y-2">
+                  <p><strong>Data Source:</strong> Landsat 8/9 Thermal Band</p>
+                  <p><strong>Processing:</strong> Digital Numbers → Radiance → Brightness Temperature → LST</p>
+                  <p><strong>Emissivity Correction:</strong> Applied using NDVI</p>
+                  <p><strong>Resolution:</strong> 30m (resampled from 100m thermal)</p>
+                </div>
+              </>
             )}
 
             {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (

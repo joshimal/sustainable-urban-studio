@@ -14,6 +14,8 @@ const censusTigerService = require('./services/gis/censusTiger');
 const municipalDataService = require('./services/gis/municipalData');
 const microsoftBuildingsService = require('./services/gis/microsoftBuildings');
 const femaSeaLevelRiseService = require('./services/gis/femaSeaLevelRise');
+const nasaGistempService = require('./services/gis/nasaGistemp');
+const modisLSTService = require('./services/gis/modisLST');
 const cacheService = require('./services/cacheService');
 
 // Import middleware and utilities
@@ -1077,6 +1079,104 @@ app.get('/api/climate/noaa/precipitation/trend', async (req, res) => {
   } catch (error) {
     const status = error.response?.status || 500;
     res.status(status).json({ success: false, error: error.message });
+  }
+});
+
+// NASA GISTEMP Temperature endpoint
+app.get('/api/nasa/temperature', async (req, res) => {
+  try {
+    const { north, south, east, west, year, resolution = 2 } = req.query;
+
+    console.log('🌡️ Fetching NASA GISTEMP temperature data...');
+
+    const bounds = {
+      north: parseFloat(north) || 90,
+      south: parseFloat(south) || -90,
+      east: parseFloat(east) || 180,
+      west: parseFloat(west) || -180
+    };
+
+    const data = await nasaGistempService.getRegionalTemperatureData(bounds, {
+      year: year ? parseInt(year) : undefined,
+      resolution: parseFloat(resolution)
+    });
+
+    res.json({
+      success: true,
+      data: data,
+      metadata: {
+        bounds: bounds,
+        year: year || new Date().getFullYear(),
+        resolution: `${resolution}° × ${resolution}°`
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching NASA temperature data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// NASA MODIS Land Surface Temperature endpoint (REAL satellite data)
+app.get('/api/modis/lst', async (req, res) => {
+  try {
+    const { north, south, east, west, date, resolution = 0.05 } = req.query;
+
+    console.log('🛰️ Fetching REAL NASA MODIS LST data...');
+
+    const bounds = {
+      north: parseFloat(north) || 41,
+      south: parseFloat(south) || 40,
+      east: parseFloat(east) || -73,
+      west: parseFloat(west) || -74
+    };
+
+    const data = await modisLSTService.getRegionalLSTData(bounds, {
+      date: date,
+      resolution: parseFloat(resolution)
+    });
+
+    res.json({
+      success: true,
+      data: data,
+      metadata: {
+        bounds: bounds,
+        date: date || new Date().toISOString().split('T')[0],
+        resolution: `${resolution}° × ${resolution}°`,
+        source: 'NASA MODIS/POWER',
+        data_type: 'real satellite data'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching MODIS LST data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get NASA GIBS tile info for direct WMS integration
+app.get('/api/modis/gibs-tiles', async (req, res) => {
+  try {
+    const { date, layer } = req.query;
+
+    const tileInfo = modisLSTService.getGIBSTileUrl({
+      date: date,
+      layer: layer
+    });
+
+    res.json({
+      success: true,
+      data: tileInfo
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
