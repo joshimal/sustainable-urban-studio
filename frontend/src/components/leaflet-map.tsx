@@ -8,6 +8,7 @@ interface LeafletMapProps {
   className?: string
   climateData?: any
   seaLevelRiseData?: any
+  elevationData?: any
   temperatureData?: any
   urbanHeatData?: any
   seaLevelFeet?: number
@@ -22,10 +23,12 @@ interface LeafletMapProps {
     borderWidth?: number
     temperatureThreshold?: number
     urbanHeatOpacity?: number
+    enabledLayers?: string[]
+    elevationOpacity?: number
   }
 }
 
-export function LeafletMap({ className, seaLevelRiseData, temperatureData, urbanHeatData, layerSettings, seaLevelFeet = 2 }: LeafletMapProps) {
+export function LeafletMap({ className, seaLevelRiseData, elevationData, temperatureData, urbanHeatData, layerSettings, seaLevelFeet = 2 }: LeafletMapProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
@@ -33,6 +36,7 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
   const mapRef = useRef<HTMLDivElement>(null)
   const geoJsonLayerRef = useRef<any>(null)
   const climateLayerRef = useRef<any>(null)
+  const elevationLayerRef = useRef<any>(null)
   const lastOpacityRef = useRef<number>(0.2)
 
   // Debug: Log props changes
@@ -42,9 +46,11 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
       hasTemperatureData: !!temperatureData,
       hasUrbanHeatData: !!urbanHeatData,
       hasSeaLevelData: !!seaLevelRiseData,
-      seaLevelFeet
+      hasElevationData: !!elevationData,
+      seaLevelFeet,
+      enabledLayers: layerSettings?.enabledLayers
     });
-  }, [layerSettings, temperatureData, urbanHeatData, seaLevelRiseData, seaLevelFeet]);
+  }, [layerSettings, temperatureData, urbanHeatData, seaLevelRiseData, elevationData, seaLevelFeet]);
 
   // Track when component is mounted and ref is ready
   useEffect(() => {
@@ -576,6 +582,207 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
       }
     }
   }, [layerSettings?.selectedDataset, urbanHeatData])  // Re-render when data changes
+
+  // Add Elevation layer from USGS 3DEP data
+  useEffect(() => {
+    console.log('🏔️ ==== ELEVATION EFFECT TRIGGERED ====', {
+      hasMap: !!mapInstanceRef.current,
+      hasData: !!elevationData,
+      dataFeatures: elevationData?.features?.length,
+      enabledLayers: layerSettings?.enabledLayers,
+      isEnabled: layerSettings?.enabledLayers?.includes('elevation'),
+      elevationDataSample: elevationData?.features?.[0]
+    })
+
+    if (!mapInstanceRef.current) {
+      console.log('❌ No map instance for elevation')
+      return
+    }
+
+    // Remove existing elevation layer when disabled
+    if (!layerSettings?.enabledLayers?.includes('elevation')) {
+      if (elevationLayerRef.current) {
+        console.log('🗑️ Removing elevation layer (disabled)')
+        mapInstanceRef.current.removeLayer(elevationLayerRef.current)
+        elevationLayerRef.current = null
+      }
+      return
+    }
+
+    // Need elevationData to proceed
+    if (!elevationData || !elevationData.features || elevationData.features.length === 0) {
+      console.log('⏳ Waiting for elevation data...')
+      return
+    }
+
+    console.log('✅ Elevation data available:', {
+      features: elevationData.features.length,
+      bbox: elevationData.bbox
+    })
+
+    const addElevationLayer = async () => {
+      try {
+        console.log('🏔️ Starting to add elevation layer...')
+
+        // Remove existing layer
+        if (elevationLayerRef.current) {
+          console.log('Removing existing elevation layer')
+          mapInstanceRef.current.removeLayer(elevationLayerRef.current)
+          elevationLayerRef.current = null
+        }
+
+        // Import Leaflet
+        const leafletModule = await import('leaflet')
+        const L = leafletModule.default
+        console.log('✅ Leaflet loaded for elevation:', !!L)
+        console.log('Has imageOverlay?', typeof L?.imageOverlay)
+
+        if (!L || !L.imageOverlay) {
+          console.error('❌ Leaflet or imageOverlay not available')
+          return
+        }
+
+        // Calculate bounds from features if bbox not present
+        let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity
+
+        if (elevationData.bbox && Array.isArray(elevationData.bbox) && elevationData.bbox.length === 4) {
+          [west, south, east, north] = elevationData.bbox
+        } else {
+          // Calculate bounds from features
+          elevationData.features.forEach((f: any) => {
+            const [lon, lat] = f.geometry.coordinates
+            west = Math.min(west, lon)
+            east = Math.max(east, lon)
+            south = Math.min(south, lat)
+            north = Math.max(north, lat)
+          })
+        }
+
+        const bounds: [[number, number], [number, number]] = [[south, west], [north, east]]
+        console.log('📍 Elevation bounds:', { west, south, east, north })
+
+        // Create canvas for elevation data
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          console.error('❌ Could not get canvas context')
+          return
+        }
+
+        // Find min/max elevation for color scaling
+        let minElev = Infinity
+        let maxElev = -Infinity
+        elevationData.features.forEach((f: any) => {
+          const elev = f.properties.elevation
+          if (elev !== null && elev !== undefined) {
+            minElev = Math.min(minElev, elev)
+            maxElev = Math.max(maxElev, elev)
+          }
+        })
+
+        console.log('📊 Elevation range:', { minElev, maxElev })
+
+        // Build grid
+        const lats = new Set<number>()
+        const lons = new Set<number>()
+        elevationData.features.forEach((f: any) => {
+          lats.add(f.geometry.coordinates[1])
+          lons.add(f.geometry.coordinates[0])
+        })
+        const sortedLats = Array.from(lats).sort((a, b) => b - a)
+        const sortedLons = Array.from(lons).sort((a, b) => a - b)
+
+        const gridHeight = sortedLats.length
+        const gridWidth = sortedLons.length
+
+        canvas.width = gridWidth
+        canvas.height = gridHeight
+
+        const imageData = ctx.createImageData(gridWidth, gridHeight)
+        const data = imageData.data
+
+        // Create lookup map
+        const elevationMap = new Map<string, number>()
+        elevationData.features.forEach((f: any) => {
+          const lat = f.geometry.coordinates[1]
+          const lon = f.geometry.coordinates[0]
+          const key = `${lat},${lon}`
+          elevationMap.set(key, f.properties.elevation)
+        })
+
+        // Fill pixels with VIBRANT color gradient for dark maps
+        for (let y = 0; y < gridHeight; y++) {
+          for (let x = 0; x < gridWidth; x++) {
+            const lat = sortedLats[y]
+            const lon = sortedLons[x]
+            const key = `${lat},${lon}`
+            const elevation = elevationMap.get(key)
+
+            const i = (y * gridWidth + x) * 4
+
+            if (elevation === null || elevation === undefined) {
+              // Transparent for missing data
+              data[i + 3] = 0
+            } else {
+              // Normalize elevation to 0-1 range
+              const normalized = (elevation - minElev) / (maxElev - minElev)
+
+              // Color gradient: VIBRANT for dark maps - deep blue (low) -> cyan -> yellow -> red (high)
+              let r, g, b
+              if (normalized < 0.33) {
+                // Deep blue to cyan
+                const t = normalized / 0.33
+                r = Math.round(0 + (0 - 0) * t)
+                g = Math.round(100 + (255 - 100) * t)
+                b = Math.round(200 + (255 - 200) * t)
+              } else if (normalized < 0.66) {
+                // Cyan to yellow
+                const t = (normalized - 0.33) / 0.33
+                r = Math.round(0 + (255 - 0) * t)
+                g = Math.round(255 + (255 - 255) * t)
+                b = Math.round(255 + (0 - 255) * t)
+              } else {
+                // Yellow to red
+                const t = (normalized - 0.66) / 0.34
+                r = Math.round(255 + (255 - 255) * t)
+                g = Math.round(255 + (0 - 255) * t)
+                b = Math.round(0 + (0 - 0) * t)
+              }
+
+              data[i] = r
+              data[i + 1] = g
+              data[i + 2] = b
+              data[i + 3] = 255
+            }
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0)
+        console.log('✅ Elevation data rendered to canvas')
+
+        const opacity = layerSettings?.elevationOpacity ?? 0.65
+        const imageOverlay = L.imageOverlay(canvas.toDataURL(), bounds, {
+          opacity: opacity,
+          interactive: false,
+          className: 'elevation-overlay'
+        })
+
+        elevationLayerRef.current = imageOverlay.addTo(mapInstanceRef.current)
+        console.log('✅ Elevation overlay added with opacity:', opacity)
+      } catch (err) {
+        console.error('❌ Error adding elevation layer:', err)
+      }
+    }
+
+    addElevationLayer()
+
+    return () => {
+      if (elevationLayerRef.current && mapInstanceRef.current) {
+        mapInstanceRef.current.removeLayer(elevationLayerRef.current)
+        elevationLayerRef.current = null
+      }
+    }
+  }, [elevationData, layerSettings?.enabledLayers, layerSettings?.elevationOpacity])
 
   return (
     <div className={`relative h-full ${className}`}>

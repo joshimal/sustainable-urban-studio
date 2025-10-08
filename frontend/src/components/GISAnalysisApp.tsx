@@ -11,6 +11,7 @@ export function GISAnalysisApp() {
   const [selectedLayer, setSelectedLayer] = useState("noaa_sea_level_rise")
   const [layerPanelOpen, setLayerPanelOpen] = useState(true)
   const [seaLevelRiseData, setSeaLevelRiseData] = useState(null)
+  const [elevationData, setElevationData] = useState(null)
   const [temperatureData, setTemperatureData] = useState(null)
   const [urbanHeatData, setUrbanHeatData] = useState(null)
   const [seaLevelFeet, setSeaLevelFeet] = useState(0)  // Start at 0ft to show current water baseline
@@ -24,7 +25,9 @@ export function GISAnalysisApp() {
     borderColor: 'cyan',  // Light blue border
     borderWidth: 1,
     temperatureThreshold: 3.2,
-    urbanHeatOpacity: 0.2  // Urban Heat Island starts at 20%
+    urbanHeatOpacity: 0.2,  // Urban Heat Island starts at 20%
+    enabledLayers: [] as string[],  // Track which layers are enabled
+    elevationOpacity: 0.65  // Elevation layer starts at 65%
   })
   const [selectedMapId, setSelectedMapId] = useState<string | null>("1")
   const [projects, setProjects] = useState([
@@ -166,6 +169,37 @@ export function GISAnalysisApp() {
     }
   };
 
+  // Fetch USGS 3DEP Elevation data
+  const fetchElevationData = async () => {
+    try {
+      console.log('🏔️ Fetching USGS 3DEP elevation data...');
+
+      // Nassau County bounding box
+      const bounds = {
+        north: 40.85,
+        south: 40.60,
+        east: -73.40,
+        west: -73.75
+      };
+
+      const response = await fetch(
+        `http://localhost:3001/api/usgs/elevation?` +
+        `north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}&resolution=20`
+      );
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setElevationData(result.data);
+        console.log(`✅ Elevation data loaded: ${result.data.features.length} points`);
+      } else {
+        console.error('❌ Failed to load elevation data:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching elevation data:', error);
+    }
+  };
+
   // Fetch REAL NASA MODIS LST data for Urban Heat Island
   const fetchModisLSTData = async () => {
     try {
@@ -227,6 +261,14 @@ export function GISAnalysisApp() {
       fetchModisLSTData();
     }
   }, [selectedLayer, layerSettings.selectedDataset]);
+
+  // Fetch elevation data when layer is enabled
+  useEffect(() => {
+    if (layerSettings.enabledLayers?.includes('elevation') && !elevationData) {
+      console.log('🏔️ Elevation layer enabled, fetching data...');
+      fetchElevationData();
+    }
+  }, [layerSettings.enabledLayers]);
 
   // Debug: Log layerSettings changes
   useEffect(() => {
@@ -312,6 +354,7 @@ export function GISAnalysisApp() {
         <div className="flex-1 relative">
           <LeafletMap
             seaLevelRiseData={layerSettings.selectedDataset === 'sea_level_rise' ? seaLevelRiseData : null}
+            elevationData={elevationData}
             temperatureData={layerSettings.selectedDataset === 'temperature' ? temperatureData : null}
             urbanHeatData={layerSettings.selectedDataset === 'urban_heat_island' ? urbanHeatData : null}
             layerSettings={layerSettings}
