@@ -7,9 +7,19 @@ import { useEffect, useRef, useState } from "react"
 interface LeafletMapProps {
   className?: string
   climateData?: any
+  location?: {
+    id: string
+    name: string
+    center: { lat: number; lng: number }
+    bounds: { north: number; south: number; east: number; west: number }
+    zoom: number
+    hasCoastalRisk: boolean
+  }
   seaLevelRiseData?: any
   temperatureData?: any
   urbanHeatData?: any
+  elevationData?: any
+  tempProjectionData?: any
   seaLevelFeet?: number
   layerSettings?: {
     selectedDataset?: string
@@ -22,16 +32,21 @@ interface LeafletMapProps {
     borderWidth?: number
     temperatureThreshold?: number
     urbanHeatOpacity?: number
+    enabledLayers?: string[]
   }
 }
 
-export function LeafletMap({ className, seaLevelRiseData, temperatureData, urbanHeatData, layerSettings, seaLevelFeet = 2 }: LeafletMapProps) {
+export function LeafletMap({ className, location, seaLevelRiseData, temperatureData, urbanHeatData, elevationData, tempProjectionData, layerSettings, seaLevelFeet = 2 }: LeafletMapProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const mapInstanceRef = useRef<any>(null)
   const mapRef = useRef<HTMLDivElement>(null)
-  const geoJsonLayerRef = useRef<any>(null)
+  const seaLevelLayerRef = useRef<any>(null)
+  const temperatureLayerRef = useRef<any>(null)
+  const urbanHeatLayerRef = useRef<any>(null)
+  const elevationLayerRef = useRef<any>(null)
+  const tempProjectionLayerRef = useRef<any>(null)
   const climateLayerRef = useRef<any>(null)
   const lastOpacityRef = useRef<number>(0.2)
 
@@ -39,17 +54,43 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
   useEffect(() => {
     console.log('🗺️ LeafletMap props updated:', {
       selectedDataset: layerSettings?.selectedDataset,
+      enabledLayers: layerSettings?.enabledLayers,
       hasTemperatureData: !!temperatureData,
+      temperatureFeatures: temperatureData?.features?.length,
       hasUrbanHeatData: !!urbanHeatData,
+      urbanHeatFeatures: urbanHeatData?.features?.length,
       hasSeaLevelData: !!seaLevelRiseData,
       seaLevelFeet
     });
+
+    if (temperatureData) {
+      console.log('📊 Temperature data details:', {
+        features: temperatureData.features.length,
+        source: temperatureData.properties?.source
+      });
+    }
+
+    if (urbanHeatData) {
+      console.log('📊 Urban heat data details:', {
+        features: urbanHeatData.features.length,
+        source: urbanHeatData.properties?.source,
+        refTemp: urbanHeatData.properties?.reference_temp
+      });
+    }
   }, [layerSettings, temperatureData, urbanHeatData, seaLevelRiseData, seaLevelFeet]);
 
   // Track when component is mounted and ref is ready
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Update map view when location changes
+  useEffect(() => {
+    if (!mapInstanceRef.current || !location) return
+
+    console.log(`🗺️ Updating map view to: ${location.name}`)
+    mapInstanceRef.current.setView([location.center.lat, location.center.lng], location.zoom)
+  }, [location])
 
   useEffect(() => {
     if (!isMounted) {
@@ -80,10 +121,15 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
         // Dynamically import Leaflet ESM build
         const L = await import('leaflet/dist/leaflet-src.esm.js')
 
+        // Use location prop or default to Nassau County
+        const center = location ? [location.center.lat, location.center.lng] : [40.7589, -73.9851]
+        const zoom = location?.zoom || 10
+        const locationName = location?.name || 'Nassau County, NY'
+
         // Create map with interaction handlers
         const leafletMap = L.map(mapRef.current as any, {
-          center: [40.7589, -73.9851], // Nassau County
-          zoom: 10,
+          center: center as any,
+          zoom: zoom,
           zoomControl: true,
           attributionControl: true,
           dragging: true,
@@ -105,8 +151,8 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
         }).addTo(leafletMap)
 
         // Add a simple marker to test
-        L.marker([40.7589, -73.9851]).addTo(leafletMap)
-          .bindPopup('Nassau County, NY')
+        L.marker(center as any).addTo(leafletMap)
+          .bindPopup(locationName)
 
         if (isComponentMounted) {
           mapInstanceRef.current = leafletMap
@@ -136,23 +182,34 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
 
   // Handle sea level rise data overlay using NOAA tile service
   useEffect(() => {
-    if (!mapInstanceRef.current) return
+    console.log('🌊 Sea level effect triggered:', {
+      hasMap: !!mapInstanceRef.current,
+      enabledLayers: layerSettings?.enabledLayers,
+      isEnabled: layerSettings?.enabledLayers?.includes('sea_level_rise'),
+      seaLevelFeet
+    });
+
+    if (!mapInstanceRef.current) {
+      console.log('❌ No map instance for sea level');
+      return;
+    }
 
     const addSeaLevelLayer = async () => {
       try {
         const L = await import('leaflet/dist/leaflet-src.esm.js')
 
-        // Remove existing layer if present
-        if (geoJsonLayerRef.current) {
-          mapInstanceRef.current.removeLayer(geoJsonLayerRef.current)
-          geoJsonLayerRef.current = null
+        // Remove existing sea level layer if present
+        if (seaLevelLayerRef.current) {
+          console.log('🧹 Removing existing sea level layer');
+          mapInstanceRef.current.removeLayer(seaLevelLayerRef.current)
+          seaLevelLayerRef.current = null
         }
 
-        // Add NOAA tile layer if sea level rise is selected
-        if (layerSettings?.selectedDataset === 'sea_level_rise') {
+        // Add NOAA tile layer if sea level rise is enabled
+        if (layerSettings?.enabledLayers?.includes('sea_level_rise')) {
           const opacity = layerSettings?.seaLevelOpacity ?? 0.6
 
-          console.log(`Loading NOAA tiles for ${seaLevelFeet}ft`)
+          console.log(`✅ Sea level rise is enabled! Loading NOAA tiles for ${seaLevelFeet}ft with opacity ${opacity}`)
 
           // Use NOAA's cached tile service directly (works for all feet values)
           // Add cache buster to force reload
@@ -169,7 +226,8 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
             }
           )
 
-          geoJsonLayerRef.current = tileLayer.addTo(mapInstanceRef.current)
+          seaLevelLayerRef.current = tileLayer.addTo(mapInstanceRef.current)
+          console.log('✅ Sea level tile layer added to map successfully');
 
           // Apply color adjustment and border effect using CSS filters
           const showBorder = layerSettings?.showBorder ?? true
@@ -215,7 +273,8 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
       hasMap: !!mapInstanceRef.current,
       hasData: !!temperatureData,
       dataFeatures: temperatureData?.features?.length,
-      selectedDataset: layerSettings?.selectedDataset
+      enabledLayers: layerSettings?.enabledLayers,
+      isEnabled: layerSettings?.enabledLayers?.includes('temperature')
     })
 
     if (!mapInstanceRef.current) {
@@ -223,13 +282,18 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
       return
     }
 
-    // Clean up if switching away from temperature
-    if (!temperatureData || layerSettings?.selectedDataset !== 'temperature') {
-      console.log('🧹 Cleaning up temperature layer')
-      if (geoJsonLayerRef.current) {
-        mapInstanceRef.current.removeLayer(geoJsonLayerRef.current)
-        geoJsonLayerRef.current = null
+    // Clean up if switching away from temperature or no data
+    if (!layerSettings?.enabledLayers?.includes('temperature')) {
+      console.log('🧹 Temperature not enabled, cleaning up layer')
+      if (temperatureLayerRef.current) {
+        mapInstanceRef.current.removeLayer(temperatureLayerRef.current)
+        temperatureLayerRef.current = null
       }
+      return
+    }
+
+    if (!temperatureData) {
+      console.log('⏳ Temperature enabled but waiting for data...')
       return
     }
 
@@ -238,17 +302,29 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
         console.log('🌡️ Starting to add temperature heatmap...')
 
         // Remove existing temperature layer
-        if (geoJsonLayerRef.current) {
+        if (temperatureLayerRef.current) {
           console.log('Removing existing layer')
-          mapInstanceRef.current.removeLayer(geoJsonLayerRef.current)
-          geoJsonLayerRef.current = null
+          mapInstanceRef.current.removeLayer(temperatureLayerRef.current)
+          temperatureLayerRef.current = null
         }
 
-        const L = (await import('leaflet')).default
-        console.log('✅ Leaflet loaded')
+        // Import Leaflet and heat plugin together
+        const [leafletModule, heatModule] = await Promise.all([
+          import('leaflet'),
+          import('leaflet.heat')
+        ]);
+        const L = leafletModule.default;
 
-        const leafletHeat = (await import('leaflet.heat')).default
+        console.log('✅ Leaflet loaded')
         console.log('✅ Leaflet.heat loaded')
+        console.log('L.heatLayer available:', typeof (L as any).heatLayer)
+
+        // If heatLayer still not available, try using the global L
+        if (!(L as any).heatLayer && typeof window !== 'undefined' && (window as any).L) {
+          console.log('⚠️ Using global L instead');
+          const globalL = (window as any).L;
+          console.log('Global L.heatLayer available:', typeof globalL.heatLayer);
+        }
 
         // Get map bounds to filter points
         const bounds = mapInstanceRef.current.getBounds()
@@ -299,8 +375,32 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
           return
         }
 
+        // The heat module extends L directly, so use the imported L
+        let heatLayerFn = (L as any).heatLayer;
+
+        // If not available on imported L, check heat module export
+        if (!heatLayerFn && heatModule) {
+          console.log('Trying heatModule export:', Object.keys(heatModule));
+          heatLayerFn = (heatModule as any).default || (heatModule as any).heatLayer;
+        }
+
+        // Last resort: use global L if available
+        if (!heatLayerFn && typeof window !== 'undefined' && (window as any).L?.heatLayer) {
+          console.log('⚠️ Using global L.heatLayer');
+          heatLayerFn = (window as any).L.heatLayer;
+        }
+
+        if (!heatLayerFn) {
+          console.error('❌ leaflet.heat plugin not loaded! heatLayer is not available');
+          console.log('L keys:', Object.keys(L).slice(0, 20));
+          console.log('heatModule:', heatModule);
+          return;
+        }
+
+        console.log('✅ Creating temperature heatmap with', heatPoints.length, 'points');
+
         // Create heatmap layer with finer, smoother appearance
-        geoJsonLayerRef.current = (L as any).heatLayer(heatPoints, {
+        temperatureLayerRef.current = heatLayerFn(heatPoints, {
           radius: 25,        // Larger radius for smoother appearance
           blur: 35,          // More blur for smooth gradients
           maxZoom: 18,       // Works at all zoom levels
@@ -318,37 +418,39 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
           }
         }).addTo(mapInstanceRef.current)
 
-        console.log('✅ Temperature heatmap added to map')
+        console.log('✅ Temperature heatmap added to map successfully');
+        console.log('Temperature layer ref:', temperatureLayerRef.current);
+        console.log('Layer on map:', mapInstanceRef.current.hasLayer(temperatureLayerRef.current))
       } catch (err) {
         console.error('❌ Error adding temperature layer:', err)
       }
     }
 
     addTemperatureLayer()
-  }, [temperatureData, layerSettings?.selectedDataset])
+  }, [temperatureData, layerSettings?.enabledLayers])
 
   // Update Urban Heat Island opacity only (separate from layer creation to prevent re-rendering)
   useEffect(() => {
-    if (!mapInstanceRef.current || !geoJsonLayerRef.current) return
-    if (layerSettings?.selectedDataset !== 'urban_heat_island') return
+    if (!mapInstanceRef.current || !urbanHeatLayerRef.current) return
+    if (!layerSettings?.enabledLayers?.includes('urban_heat_island')) return
 
     const newOpacity = layerSettings?.urbanHeatOpacity || 0.2
 
     // Only update if opacity actually changed
     if (Math.abs(newOpacity - lastOpacityRef.current) > 0.001) {
       console.log('🎨 Updating Urban Heat Island opacity:', newOpacity)
-      geoJsonLayerRef.current.setOpacity(newOpacity)
+      urbanHeatLayerRef.current.setOpacity(newOpacity)
       lastOpacityRef.current = newOpacity
     }
-  }, [layerSettings?.urbanHeatOpacity, layerSettings?.selectedDataset])
+  }, [layerSettings?.urbanHeatOpacity, layerSettings?.enabledLayers])
 
   // Add Urban Heat Island layer - REAL NASA MODIS LST data
   useEffect(() => {
     console.log('🔍 Urban Heat Island effect triggered', {
       hasMap: !!mapInstanceRef.current,
       hasUrbanHeatData: !!urbanHeatData,
-      selectedDataset: layerSettings?.selectedDataset,
-      shouldShow: layerSettings?.selectedDataset === 'urban_heat_island'
+      enabledLayers: layerSettings?.enabledLayers,
+      shouldShow: layerSettings?.enabledLayers?.includes('urban_heat_island')
     })
 
     if (!mapInstanceRef.current) {
@@ -356,12 +458,12 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
       return
     }
 
-    // Remove existing layer when switching away from urban heat island
-    if (layerSettings?.selectedDataset !== 'urban_heat_island') {
-      console.log('🧹 Not urban heat island dataset, cleaning up if needed')
-      if (geoJsonLayerRef.current) {
-        mapInstanceRef.current.removeLayer(geoJsonLayerRef.current)
-        geoJsonLayerRef.current = null
+    // Remove existing layer when not enabled
+    if (!layerSettings?.enabledLayers?.includes('urban_heat_island')) {
+      console.log('🧹 Urban heat island not enabled, cleaning up if needed')
+      if (urbanHeatLayerRef.current) {
+        mapInstanceRef.current.removeLayer(urbanHeatLayerRef.current)
+        urbanHeatLayerRef.current = null
       }
       // Remove map move listener
       if (mapInstanceRef.current) {
@@ -495,10 +597,10 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
         console.log('🌡️ Starting to add Urban Heat Island layer with REAL NASA MODIS LST data...')
 
         // Remove existing layer
-        if (geoJsonLayerRef.current) {
+        if (urbanHeatLayerRef.current) {
           console.log('Removing existing layer')
-          mapInstanceRef.current.removeLayer(geoJsonLayerRef.current)
-          geoJsonLayerRef.current = null
+          mapInstanceRef.current.removeLayer(urbanHeatLayerRef.current)
+          urbanHeatLayerRef.current = null
         }
 
         const L = (await import('leaflet')).default
@@ -534,7 +636,7 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
           className: 'urban-heat-overlay'
         })
 
-        geoJsonLayerRef.current = imageOverlay.addTo(mapInstanceRef.current)
+        urbanHeatLayerRef.current = imageOverlay.addTo(mapInstanceRef.current)
 
         console.log('✅ Urban Heat Island overlay added with opacity:', opacity)
         console.log(`🛰️ Data source: ${urbanHeatData.properties.source}`)
@@ -575,10 +677,189 @@ export function LeafletMap({ className, seaLevelRiseData, temperatureData, urban
         mapInstanceRef.current.off('moveend', handleMapMove)
       }
     }
-  }, [layerSettings?.selectedDataset, urbanHeatData])  // Re-render when data changes
+  }, [layerSettings?.enabledLayers, urbanHeatData])  // Re-render when enabled or data changes
+
+  // Add Elevation layer - translucent 30%
+  useEffect(() => {
+    console.log('🏔️ ==== ELEVATION EFFECT TRIGGERED ====', {
+      hasMap: !!mapInstanceRef.current,
+      hasData: !!elevationData,
+      dataFeatures: elevationData?.features?.length,
+      enabledLayers: layerSettings?.enabledLayers,
+      isEnabled: layerSettings?.enabledLayers?.includes('elevation'),
+      elevationDataSample: elevationData?.features?.[0]
+    })
+
+    if (!mapInstanceRef.current) {
+      console.log('❌ No map instance for elevation')
+      return
+    }
+
+    // Clean up if not enabled
+    if (!layerSettings?.enabledLayers?.includes('elevation')) {
+      console.log('🧹 Elevation not enabled, cleaning up layer')
+      if (elevationLayerRef.current) {
+        mapInstanceRef.current.removeLayer(elevationLayerRef.current)
+        elevationLayerRef.current = null
+      }
+      return
+    }
+
+    if (!elevationData) {
+      console.log('⏳ Elevation enabled but waiting for data...')
+      return
+    }
+
+    const addElevationLayer = async () => {
+      try {
+        console.log('🏔️ Starting to add elevation layer...')
+
+        // Remove existing elevation layer
+        if (elevationLayerRef.current) {
+          console.log('Removing existing layer')
+          mapInstanceRef.current.removeLayer(elevationLayerRef.current)
+          elevationLayerRef.current = null
+        }
+
+        const L = (await import('leaflet')).default
+
+        // Get current map bounds
+        const mapBounds = mapInstanceRef.current.getBounds()
+        const south = mapBounds.getSouth()
+        const west = mapBounds.getWest()
+        const north = mapBounds.getNorth()
+        const east = mapBounds.getEast()
+
+        console.log('Map bounds:', { south, west, north, east })
+
+        // Create canvas for elevation heatmap
+        const canvas = document.createElement('canvas')
+        canvas.width = 800
+        canvas.height = 600
+        const ctx = canvas.getContext('2d')!
+
+        const width = canvas.width
+        const height = canvas.height
+        const imageData = ctx.createImageData(width, height)
+        const data = imageData.data
+
+        // Get elevation values
+        const elevValues = elevationData.features.map((f: any) => f.properties.elevation)
+        const minElev = Math.min(...elevValues)
+        const maxElev = Math.max(...elevValues)
+
+        console.log(`📊 Elevation range: ${minElev.toFixed(1)}m - ${maxElev.toFixed(1)}m`)
+
+        // Create spatial index
+        const elevGrid: { [key: string]: number } = {}
+        elevationData.features.forEach((feature: any) => {
+          const [lon, lat] = feature.geometry.coordinates
+          const elev = feature.properties.elevation
+          const key = `${lat.toFixed(2)},${lon.toFixed(2)}`
+          elevGrid[key] = elev
+        })
+
+        // Render elevation pattern
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4
+
+            // Convert pixel to lat/lon
+            const lat = north - (y / height) * (north - south)
+            const lon = west + (x / width) * (east - west)
+
+            // Find nearest elevation
+            const key = `${lat.toFixed(2)},${lon.toFixed(2)}`
+            let elevValue = elevGrid[key]
+
+            if (!elevValue) {
+              const nearby = elevationData.features
+                .map((f: any) => {
+                  const [flon, flat] = f.geometry.coordinates
+                  const dist = Math.sqrt(Math.pow(flat - lat, 2) + Math.pow(flon - lon, 2))
+                  return { dist, elev: f.properties.elevation }
+                })
+                .sort((a: any, b: any) => a.dist - b.dist)
+                .slice(0, 4)
+
+              if (nearby.length > 0) {
+                const totalWeight = nearby.reduce((sum: number, p: any) => sum + (1 / (p.dist + 0.001)), 0)
+                elevValue = nearby.reduce((sum: number, p: any) =>
+                  sum + p.elev * (1 / (p.dist + 0.001)), 0) / totalWeight
+              } else {
+                elevValue = minElev
+              }
+            }
+
+            // Normalize elevation to 0-1
+            const normalized = (elevValue - minElev) / (maxElev - minElev)
+
+            // Color gradient: VIBRANT for dark maps - deep blue (low) -> cyan -> yellow -> red (high)
+            let r, g, b
+            if (normalized < 0.33) {
+              // Deep blue to cyan
+              const t = normalized / 0.33
+              r = Math.round(0 + (0 - 0) * t)
+              g = Math.round(100 + (255 - 100) * t)
+              b = Math.round(200 + (255 - 200) * t)
+            } else if (normalized < 0.66) {
+              // Cyan to yellow
+              const t = (normalized - 0.33) / 0.33
+              r = Math.round(0 + (255 - 0) * t)
+              g = Math.round(255 + (255 - 255) * t)
+              b = Math.round(255 + (0 - 255) * t)
+            } else {
+              // Yellow to red
+              const t = (normalized - 0.66) / 0.34
+              r = Math.round(255 + (255 - 255) * t)
+              g = Math.round(255 + (0 - 255) * t)
+              b = Math.round(0 + (0 - 0) * t)
+            }
+
+            data[i] = r
+            data[i + 1] = g
+            data[i + 2] = b
+            data[i + 3] = 255
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0)
+        console.log('✅ Elevation data rendered to canvas')
+
+        // Convert canvas to image overlay
+        const bounds = [
+          [south, west],
+          [north, east]
+        ] as any
+
+        const imageOverlay = L.imageOverlay(canvas.toDataURL(), bounds, {
+          opacity: 0.65,  // 65% opacity for better visibility on dark maps
+          interactive: false,
+          className: 'elevation-overlay'
+        })
+
+        elevationLayerRef.current = imageOverlay.addTo(mapInstanceRef.current)
+
+        console.log('✅ Elevation overlay added with 65% opacity')
+      } catch (err) {
+        console.error('❌ Error adding elevation layer:', err)
+      }
+    }
+
+    addElevationLayer()
+  }, [elevationData, layerSettings?.enabledLayers])
 
   return (
     <div className={`relative h-full ${className}`}>
+      {/* Debug layer status */}
+      <div className="absolute top-2 left-2 z-[2000] bg-black/80 text-white p-2 text-xs rounded">
+        <div>Sea Level: {seaLevelLayerRef.current ? '✅' : '❌'}</div>
+        <div>Elevation: {elevationLayerRef.current ? '✅' : '❌'}</div>
+        <div>Temp Proj: {tempProjectionLayerRef.current ? '✅' : '❌'}</div>
+        <div>Temperature: {temperatureLayerRef.current ? '✅' : '❌'}</div>
+        <div>Urban Heat: {urbanHeatLayerRef.current ? '✅' : '❌'}</div>
+        <div>Enabled: {layerSettings?.enabledLayers?.join(', ') || 'none'}</div>
+      </div>
       <div
         ref={mapRef}
         className="absolute inset-0"

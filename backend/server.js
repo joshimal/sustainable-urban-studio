@@ -1244,6 +1244,165 @@ app.get('/api/noaa/sea-level-rise', async (req, res) => {
   }
 });
 
+// USGS Elevation endpoint
+app.get('/api/usgs/elevation', async (req, res) => {
+  try {
+    const { north, south, east, west, resolution = 20 } = req.query;
+
+    if (!north || !south || !east || !west) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bounding box coordinates required (north, south, east, west)'
+      });
+    }
+
+    console.log(`🏔️ Generating elevation data for bounds...`);
+
+    // Generate elevation grid data
+    const elevationData = {
+      type: 'FeatureCollection',
+      features: [],
+      properties: {
+        source: 'USGS 3DEP (Simulated)',
+        resolution: `${resolution}m`,
+        units: 'meters'
+      }
+    };
+
+    const latStep = (parseFloat(north) - parseFloat(south)) / parseInt(resolution);
+    const lonStep = (parseFloat(east) - parseFloat(west)) / parseInt(resolution);
+
+    for (let lat = parseFloat(south); lat < parseFloat(north); lat += latStep) {
+      for (let lon = parseFloat(west); lon < parseFloat(east); lon += lonStep) {
+        // Simulate elevation based on distance from center (simple model)
+        const centerLat = (parseFloat(north) + parseFloat(south)) / 2;
+        const centerLon = (parseFloat(east) + parseFloat(west)) / 2;
+        const distFromCenter = Math.sqrt(Math.pow(lat - centerLat, 2) + Math.pow(lon - centerLon, 2));
+
+        // Create varied terrain
+        const baseElevation = distFromCenter * 50;
+        const noise = (Math.sin(lat * 100) * Math.cos(lon * 100)) * 10;
+        const elevation = Math.max(0, baseElevation + noise + (Math.random() - 0.5) * 5);
+
+        elevationData.features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [lon, lat]
+          },
+          properties: {
+            elevation: parseFloat(elevation.toFixed(2)),
+            elevationFeet: parseFloat((elevation * 3.28084).toFixed(2))
+          }
+        });
+      }
+    }
+
+    console.log(`✅ Generated ${elevationData.features.length} elevation points`);
+
+    res.json({
+      success: true,
+      data: elevationData,
+      metadata: {
+        bounds: { north, south, east, west },
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ USGS elevation error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// NASA Temperature Projection endpoint
+app.get('/api/nasa/temperature-projection', async (req, res) => {
+  try {
+    const { north, south, east, west, year = 2050, scenario = 'rcp45' } = req.query;
+
+    if (!north || !south || !east || !west) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bounding box coordinates required (north, south, east, west)'
+      });
+    }
+
+    console.log(`🌡️ Generating temperature projection for ${year}, scenario ${scenario}...`);
+
+    // Temperature increase scenarios based on RCP pathways
+    const scenarios = {
+      rcp26: { baseline: 14.5, increase2050: 1.5, increase2100: 2.0 },  // Low emissions
+      rcp45: { baseline: 14.5, increase2050: 2.0, increase2100: 3.2 },  // Moderate
+      rcp85: { baseline: 14.5, increase2050: 2.5, increase2100: 4.8 }   // High emissions
+    };
+
+    const config = scenarios[scenario] || scenarios.rcp45;
+    const yearInt = parseInt(year);
+    const yearProgress = Math.max(0, Math.min(1, (yearInt - 2025) / (2100 - 2025)));
+    const projectedIncrease = config.increase2050 + (config.increase2100 - config.increase2050) * yearProgress;
+
+    // Generate temperature grid
+    const tempData = {
+      type: 'FeatureCollection',
+      features: [],
+      properties: {
+        source: 'NASA NEX-GDDP-CMIP6 (Simulated)',
+        scenario: scenario,
+        year: yearInt,
+        baselinePeriod: '1986-2005',
+        projectedIncrease: parseFloat(projectedIncrease.toFixed(2))
+      }
+    };
+
+    const latStep = (parseFloat(north) - parseFloat(south)) / 15;
+    const lonStep = (parseFloat(east) - parseFloat(west)) / 15;
+
+    for (let lat = parseFloat(south); lat < parseFloat(north); lat += latStep) {
+      for (let lon = parseFloat(west); lon < parseFloat(east); lon += lonStep) {
+        // Vary temperature by latitude and urban effects
+        const latEffect = (lat - 35) * 0.2; // Cooler in north
+        const urbanEffect = Math.random() * 2; // 0-2°C urban heat island
+        const tempAnomaly = projectedIncrease + latEffect + urbanEffect + (Math.random() - 0.5) * 0.5;
+
+        tempData.features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [lon, lat]
+          },
+          properties: {
+            tempAnomaly: parseFloat(tempAnomaly.toFixed(2)),
+            tempAnomalyF: parseFloat((tempAnomaly * 1.8).toFixed(2)),
+            baseline: config.baseline,
+            projected: parseFloat((config.baseline + tempAnomaly).toFixed(2))
+          }
+        });
+      }
+    }
+
+    console.log(`✅ Generated ${tempData.features.length} temperature projection points`);
+
+    res.json({
+      success: true,
+      data: tempData,
+      metadata: {
+        bounds: { north, south, east, west },
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ NASA temperature projection error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
 const startServer = async () => {
   await createUploadsDir();
@@ -1259,7 +1418,9 @@ const startServer = async () => {
     console.log(`   - Municipal Open Data: /api/gis/municipal`);
     console.log(`   - Microsoft Buildings: /api/gis/microsoft-buildings`);
     console.log(`   - FEMA Sea Level Rise: /api/gis/fema-sea-level-rise`);
-    console.log(`🌊 NOAA Sea Level Rise endpoint: /api/noaa/sea-level-rise`);
+    console.log(`🌊 NOAA Sea Level Rise: /api/noaa/sea-level-rise`);
+    console.log(`🏔️ USGS Elevation: /api/usgs/elevation`);
+    console.log(`🌡️ NASA Temperature Projection: /api/nasa/temperature-projection`);
   });
 };
 

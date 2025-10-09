@@ -6,16 +6,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { Separator } from "./ui/separator"
 import { useState } from "react"
 import { X, MoreHorizontal, Plus, ChevronDown, ChevronRight } from "lucide-react"
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 
 interface LayerPanelProps {
   selectedLayer: string
   onClose?: () => void
   onSeaLevelChange?: (feet: number) => void
+  onProjectionYearChange?: (year: number) => void
+  onClimateScenarioChange?: (scenario: string) => void
   onLayerSettingsChange?: (settings: any) => void
   seaLevelFeet?: number
+  projectionYear?: number
+  climateScenario?: string
 }
 
-export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSettingsChange, seaLevelFeet = 0 }: LayerPanelProps) {
+export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onProjectionYearChange, onClimateScenarioChange, onLayerSettingsChange, seaLevelFeet = 0, projectionYear = 2050, climateScenario = 'rcp45' }: LayerPanelProps) {
   // Prevent mouse events from propagating to the map
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -23,18 +28,18 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
   const [dataSource, setDataSource] = useState("NOAA")
   const [selectedDataset, setSelectedDataset] = useState("sea_level_rise")
   const [datasetsExpanded, setDatasetsExpanded] = useState(true)
-  const [enabledLayers, setEnabledLayers] = useState<string[]>(["sea_level_rise"])
+  const [enabledLayers, setEnabledLayers] = useState<string[]>([])
   const [layerOrder, setLayerOrder] = useState<string[]>([
     "sea_level_rise",
-    "flood_exposure",
-    "land_cover",
     "elevation",
-    "water_quality",
+    "temperature_projection",
     "temperature",
     "urban_heat_island"
   ])
   const [draggedLayer, setDraggedLayer] = useState<string | null>(null)
+  const [expandedLayers, setExpandedLayers] = useState<string[]>([])  // Track which layer panels are expanded
   const [seaLevelOpacity, setSeaLevelOpacity] = useState([60])
+  const [temperatureOpacity, setTemperatureOpacity] = useState([70])  // Temperature starts at 70%
   const [urbanHeatOpacity, setUrbanHeatOpacity] = useState([20])  // Urban Heat Island starts at 20%
   const [size, setSize] = useState([8])
   const [temperatureThreshold, setTemperatureThreshold] = useState([0])  // Start at 0°C to show all data
@@ -42,6 +47,14 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
   const [displayStyle, setDisplayStyle] = useState("depth") // "depth" or "extent"
   const [showBorder, setShowBorder] = useState(true)  // Default to on
   const [borderColor, setBorderColor] = useState("cyan")  // Light blue default
+
+  const toggleLayerExpanded = (layerId: string) => {
+    setExpandedLayers(prev =>
+      prev.includes(layerId)
+        ? prev.filter(id => id !== layerId)
+        : [...prev, layerId]
+    )
+  }
 
   // Notify parent component of layer settings changes
   const updateLayerSettings = (settings: any) => {
@@ -62,20 +75,37 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
   }
 
   const toggleLayer = (layerId: string) => {
-    const newEnabledLayers = enabledLayers.includes(layerId)
+    const wasEnabled = enabledLayers.includes(layerId)
+    const newEnabledLayers = wasEnabled
       ? enabledLayers.filter(id => id !== layerId)
       : [...enabledLayers, layerId]
 
+    console.log('🔲 toggleLayer called:', {
+      layerId,
+      wasEnabled,
+      newEnabledLayers
+    });
+
     setEnabledLayers(newEnabledLayers)
 
-    // Set as active dataset if enabling
-    if (!enabledLayers.includes(layerId)) {
+    // Auto-expand panel when enabling a layer
+    if (!wasEnabled) {
+      setExpandedLayers(prev => [...prev, layerId])
       setSelectedDataset(layerId)
+      console.log('📤 Calling updateLayerSettings with:', {
+        selectedDataset: layerId,
+        enabledLayers: newEnabledLayers
+      });
       updateLayerSettings({
         selectedDataset: layerId,
         enabledLayers: newEnabledLayers
       })
     } else {
+      // Collapse panel when disabling a layer
+      setExpandedLayers(prev => prev.filter(id => id !== layerId))
+      console.log('📤 Calling updateLayerSettings with:', {
+        enabledLayers: newEnabledLayers
+      });
       updateLayerSettings({ enabledLayers: newEnabledLayers })
     }
   }
@@ -105,12 +135,10 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
 
   const getLayerName = (layerId: string): string => {
     const names: { [key: string]: string } = {
-      sea_level_rise: "Sea Level Rise",
-      flood_exposure: "Flood Exposure",
-      land_cover: "Land Cover",
-      elevation: "Elevation",
-      water_quality: "Water Quality",
-      temperature: "Surface Temperature (NASA GISTEMP)",
+      sea_level_rise: "Sea Level Rise (NOAA)",
+      elevation: "Elevation (USGS 3DEP)",
+      temperature_projection: "Future Temperature (NASA NEX-GDDP)",
+      temperature: "Current Surface Temperature (NASA GISTEMP)",
       urban_heat_island: "Urban Heat Island (NASA MODIS LST)"
     }
     return names[layerId] || layerId
@@ -164,85 +192,77 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
             </Button>
           )}
         </div>
-
-        {/* Data Source Dropdown */}
-        <div className="mb-3">
-          <Select value={dataSource} onValueChange={setDataSource}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="NOAA">NOAA</SelectItem>
-              <SelectItem value="FEMA">FEMA</SelectItem>
-              <SelectItem value="USGS">USGS</SelectItem>
-              <SelectItem value="Census">Census TIGER</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Datasets Dropdown */}
-        <div className="mt-3">
-          <div
-            className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50 cursor-pointer"
-            onClick={() => setDatasetsExpanded(!datasetsExpanded)}
-          >
-            {datasetsExpanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-            <span className="text-sm font-medium">Datasets</span>
-          </div>
-
-          {datasetsExpanded && (
-            <div className="ml-2 mt-2 space-y-1">
-              <div className="text-xs text-muted-foreground mb-2 px-2">
-                Check layers to enable • Drag to reorder
-              </div>
-              {layerOrder.map((layerId) => (
-                <div
-                  key={layerId}
-                  draggable
-                  onDragStart={() => handleDragStart(layerId)}
-                  onDragOver={(e) => handleDragOver(e, layerId)}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => {
-                    if (enabledLayers.includes(layerId)) {
-                      setSelectedDataset(layerId)
-                      updateLayerSettings({ selectedDataset: layerId })
-                    }
-                  }}
-                  className={`flex items-center gap-2 p-2 rounded cursor-move hover:bg-gray-800/50 ${
-                    selectedDataset === layerId && enabledLayers.includes(layerId)
-                      ? 'bg-blue-500/20 border border-blue-500/50'
-                      : ''
-                  } ${draggedLayer === layerId ? 'opacity-50' : ''}`}
-                >
-                  <span className="text-gray-500 text-xs">⋮⋮</span>
-                  <input
-                    type="checkbox"
-                    checked={enabledLayers.includes(layerId)}
-                    onChange={(e) => {
-                      e.stopPropagation()
-                      toggleLayer(layerId)
-                      console.log(`🔲 Layer "${layerId}" ${enabledLayers.includes(layerId) ? 'disabled' : 'enabled'}`)
-                    }}
-                    className="w-4 h-4 cursor-pointer"
-                  />
-                  <span className="text-sm flex-1">{getLayerName(layerId)}</span>
-                  {enabledLayers.includes(layerId) && (
-                    <span className="text-xs text-green-400">●</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
+      {/* Resizable Panels */}
+      <PanelGroup direction="vertical" className="flex-1">
+        {/* Climate Data Layers Panel */}
+        <Panel defaultSize={35} minSize={20}>
+          <div className="h-full overflow-y-auto px-4 pt-3">
+            <div
+              className="flex items-center gap-2 p-2 rounded hover:bg-gray-800/50 cursor-pointer"
+              onClick={() => setDatasetsExpanded(!datasetsExpanded)}
+            >
+              {datasetsExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+              <span className="text-sm font-medium">Climate Data Layers</span>
+            </div>
 
-      {/* Layer Tabs */}
-      <div className="flex-1 overflow-y-auto px-4">
+            {datasetsExpanded && (
+              <div className="ml-2 mt-2 space-y-1 pb-4">
+                <div className="text-xs text-muted-foreground mb-2 px-2">
+                  Check layers to enable • Drag to reorder
+                </div>
+                {layerOrder.map((layerId) => (
+                  <div
+                    key={layerId}
+                    draggable
+                    onDragStart={() => handleDragStart(layerId)}
+                    onDragOver={(e) => handleDragOver(e, layerId)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => {
+                      if (enabledLayers.includes(layerId)) {
+                        setSelectedDataset(layerId)
+                        updateLayerSettings({ selectedDataset: layerId })
+                      }
+                    }}
+                    className={`flex items-center gap-2 p-2 rounded cursor-move hover:bg-gray-800/50 ${
+                      selectedDataset === layerId && enabledLayers.includes(layerId)
+                        ? 'bg-blue-500/20 border border-blue-500/50'
+                        : ''
+                    } ${draggedLayer === layerId ? 'opacity-50' : ''}`}
+                  >
+                    <span className="text-gray-500 text-xs">⋮⋮</span>
+                    <input
+                      type="checkbox"
+                      checked={enabledLayers.includes(layerId)}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        toggleLayer(layerId)
+                        console.log(`🔲 Layer "${layerId}" ${enabledLayers.includes(layerId) ? 'disabled' : 'enabled'}`)
+                      }}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-sm flex-1 truncate">{getLayerName(layerId)}</span>
+                    {enabledLayers.includes(layerId) && (
+                      <span className="text-xs text-green-400">●</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        {/* Draggable Divider */}
+        <PanelResizeHandle className="h-1 bg-gray-700 hover:bg-blue-500 transition-colors cursor-row-resize" />
+
+        {/* Layer Controls Panel */}
+        <Panel defaultSize={65} minSize={30}>
+          <div className="h-full overflow-y-auto px-4">
         <Tabs defaultValue="controls" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mt-4">
             <TabsTrigger value="controls" className="text-xs">
@@ -253,286 +273,339 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="controls" className="py-4 space-y-6">
-            {/* Sea Level Rise Slider - only show for sea level rise dataset */}
-            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
-              <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/30">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium">🌊 Sea Level Rise</label>
-                  <span className="text-lg font-bold text-blue-400">{seaLevelFeet} feet</span>
-                </div>
-                <div className="space-y-2">
-                  <Slider
-                    value={[seaLevelFeet]}
-                    onValueChange={(value) => {
-                      if (onSeaLevelChange) {
-                        onSeaLevelChange(value[0])
-                      }
-                    }}
-                    min={0}
-                    max={6}
-                    step={1}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>0ft</span>
-                    <span>3ft</span>
-                    <span>6ft</span>
+          <TabsContent value="controls" className="py-4 space-y-3">
+            {/* Render enabled layers as collapsible panels in order */}
+            {layerOrder.filter(layerId => enabledLayers.includes(layerId)).map((layerId) => (
+              <div key={layerId} className="border border-gray-700 rounded-lg overflow-hidden">
+                {/* Layer header - clickable to expand/collapse */}
+                <div
+                  className="flex items-center justify-between p-3 bg-gray-800/50 cursor-pointer hover:bg-gray-800/70"
+                  onClick={() => toggleLayerExpanded(layerId)}
+                >
+                  <div className="flex items-center gap-2">
+                    {expandedLayers.includes(layerId) ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <span className="text-sm font-medium truncate">{getLayerName(layerId)}</span>
                   </div>
-                  <div className="text-xs text-blue-300 mt-2">
-                    {seaLevelFeet === 0 && "Baseline (Current)"}
-                    {seaLevelFeet === 1 && "Low (~2050)"}
-                    {seaLevelFeet === 2 && "Intermediate-Low (~2070)"}
-                    {seaLevelFeet === 3 && "Intermediate (~2100)"}
-                    {seaLevelFeet === 4 && "Intermediate-High (~2100)"}
-                    {seaLevelFeet === 5 && "High (~2100)"}
-                    {seaLevelFeet === 6 && "Extreme (~2150)"}
-                  </div>
+                  <span className="text-xs text-green-400">●</span>
                 </div>
+
+                {/* Layer controls - shown when expanded */}
+                {expandedLayers.includes(layerId) && (
+                  <div className="p-4 space-y-4">
+                    {layerId === "sea_level_rise" && selectedLayer === "noaa_sea_level_rise" && (
+                      <>
+                        {/* Sea Level Rise Controls */}
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-medium">Sea Level Rise</label>
+                            <span className="text-lg font-bold text-blue-400">{seaLevelFeet} feet</span>
+                          </div>
+                          <Slider
+                            value={[seaLevelFeet]}
+                            onValueChange={(value) => {
+                              if (onSeaLevelChange) {
+                                onSeaLevelChange(value[0])
+                              }
+                            }}
+                            min={0}
+                            max={6}
+                            step={1}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                            <span>0ft</span>
+                            <span>3ft</span>
+                            <span>6ft</span>
+                          </div>
+                          <div className="text-xs text-blue-300 mt-2">
+                            {seaLevelFeet === 0 && "Baseline (Current)"}
+                            {seaLevelFeet === 1 && "Low (~2050)"}
+                            {seaLevelFeet === 2 && "Intermediate-Low (~2070)"}
+                            {seaLevelFeet === 3 && "Intermediate (~2100)"}
+                            {seaLevelFeet === 4 && "Intermediate-High (~2100)"}
+                            {seaLevelFeet === 5 && "High (~2100)"}
+                            {seaLevelFeet === 6 && "Extreme (~2150)"}
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Display Style */}
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Display style</label>
+                          <Select value={displayStyle} onValueChange={(value) => {
+                            setDisplayStyle(value)
+                            updateLayerSettings({ displayStyle: value })
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="depth">Depth (Layer 1)</SelectItem>
+                              <SelectItem value="extent">Extent Only (Layer 0)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <Separator />
+
+                        {/* Opacity */}
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
+                          <Slider
+                            value={seaLevelOpacity}
+                            onValueChange={(value) => {
+                              setSeaLevelOpacity(value)
+                              updateLayerSettings({ opacity: value[0] })
+                            }}
+                            max={100}
+                            step={1}
+                            className="w-full"
+                          />
+                          <span className="text-xs text-muted-foreground">{seaLevelOpacity[0]}%</span>
+                        </div>
+
+                        <Separator />
+
+                        {/* Border Controls */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <input
+                              type="checkbox"
+                              checked={showBorder}
+                              onChange={(e) => {
+                                setShowBorder(e.target.checked)
+                                updateLayerSettings({ showBorder: e.target.checked })
+                              }}
+                              className="w-4 h-4 cursor-pointer"
+                            />
+                            <label className="text-sm font-medium">Show Border</label>
+                          </div>
+
+                          {showBorder && (
+                            <div className="space-y-3 ml-6">
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1 block">Border color</label>
+                                <Select value={borderColor} onValueChange={(value) => {
+                                  setBorderColor(value)
+                                  updateLayerSettings({ borderColor: value })
+                                }}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="cyan">Light Blue (Cyan)</SelectItem>
+                                    <SelectItem value="white">White</SelectItem>
+                                    <SelectItem value="black">Black</SelectItem>
+                                    <SelectItem value="yellow">Yellow</SelectItem>
+                                    <SelectItem value="red">Red</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-2 block">Width: {borderWidth[0]}px</label>
+                                <Slider
+                                  value={borderWidth}
+                                  onValueChange={(value) => {
+                                    setBorderWidth(value)
+                                    updateLayerSettings({ borderWidth: value[0] })
+                                  }}
+                                  max={5}
+                                  step={1}
+                                  className="w-full"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {layerId === "elevation" && (
+                      <>
+                        <div className="text-xs text-cyan-300 mb-2">
+                          Terrain elevation data shown with 65% opacity overlay
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Deep Blue (low elevation) → Cyan → Yellow → Red (high elevation)
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-2">
+                          Optimized colors for dark map background
+                        </div>
+                      </>
+                    )}
+
+                    {layerId === "temperature_projection" && (
+                      <>
+                        {/* Year Slider */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium">Projection Year</label>
+                            <span className="text-lg font-bold text-orange-400">{projectionYear}</span>
+                          </div>
+                          <Slider
+                            value={[projectionYear]}
+                            onValueChange={(value) => {
+                              if (onProjectionYearChange) {
+                                onProjectionYearChange(value[0])
+                              }
+                            }}
+                            min={2030}
+                            max={2100}
+                            step={10}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                            <span>2030</span>
+                            <span>2065</span>
+                            <span>2100</span>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Climate Scenario */}
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Emissions Scenario</label>
+                          <Select value={climateScenario} onValueChange={(value) => {
+                            if (onClimateScenarioChange) {
+                              onClimateScenarioChange(value)
+                            }
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="rcp26">RCP 2.6 (Low Emissions)</SelectItem>
+                              <SelectItem value="rcp45">RCP 4.5 (Moderate Emissions)</SelectItem>
+                              <SelectItem value="rcp85">RCP 8.5 (High Emissions)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="text-xs text-orange-300 mt-2">
+                          NASA NEX-GDDP-CMIP6 climate model projections
+                        </div>
+                      </>
+                    )}
+
+                    {layerId === "temperature" && (
+                      <>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium">Temperature Anomaly Filter</label>
+                            <span className="text-lg font-bold text-red-400">
+                              {temperatureThreshold[0] === 0 ? 'All' : `≥${temperatureThreshold[0]}°C`}
+                            </span>
+                          </div>
+                          <Slider
+                            value={temperatureThreshold}
+                            onValueChange={(value) => {
+                              setTemperatureThreshold(value)
+                              updateLayerSettings({ temperatureThreshold: value[0] })
+                            }}
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                            <span>0°C (All)</span>
+                            <span>2.5°C</span>
+                            <span>5°C</span>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
+                          <Slider
+                            value={temperatureOpacity}
+                            onValueChange={(value) => {
+                              setTemperatureOpacity(value)
+                              updateLayerSettings({ temperatureOpacity: value[0] })
+                            }}
+                            max={100}
+                            step={1}
+                            className="w-full"
+                          />
+                          <span className="text-xs text-muted-foreground">{temperatureOpacity[0]}%</span>
+                        </div>
+
+                        <div className="text-xs text-red-300 mt-2">
+                          NASA GISTEMP global surface temperature anomaly
+                        </div>
+                      </>
+                    )}
+
+                    {layerId === "urban_heat_island" && (
+                      <>
+                        <div className="text-xs text-green-300 mb-2">
+                          <strong>✅ REAL SATELLITE DATA</strong> - NASA MODIS LST
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
+                          <Slider
+                            value={urbanHeatOpacity}
+                            onValueChange={(value) => {
+                              setUrbanHeatOpacity(value)
+                              updateLayerSettings({ urbanHeatOpacity: value[0] })
+                            }}
+                            max={100}
+                            step={1}
+                            className="w-full"
+                          />
+                          <span className="text-xs text-muted-foreground">{urbanHeatOpacity[0]}%</span>
+                        </div>
+
+                        <Separator />
+
+                        {/* Temperature Scale Legend */}
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Temperature Scale</label>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 bg-[#2166ac] rounded"></div>
+                              <span className="text-muted-foreground">Coolest (Blue)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 bg-[#92c5de] rounded"></div>
+                              <span className="text-muted-foreground">Cool (Cyan)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 bg-[#fddbca] rounded"></div>
+                              <span className="text-muted-foreground">Moderate (Beige)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 bg-[#f4a582] rounded"></div>
+                              <span className="text-muted-foreground">Warm (Orange)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 bg-[#b2182b] rounded"></div>
+                              <span className="text-muted-foreground">Hottest (Red)</span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Show message if no layers are enabled */}
+            {enabledLayers.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                Check a layer above to see its controls
               </div>
             )}
-
-            {/* Display Style - Only show for sea level rise */}
-            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium">Display style</label>
-                </div>
-                <Select value={displayStyle} onValueChange={(value) => {
-                  setDisplayStyle(value)
-                  updateLayerSettings({ displayStyle: value })
-                }}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="depth">Depth (Layer 1)</SelectItem>
-                    <SelectItem value="extent">Extent Only (Layer 0)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-
-            {/* Opacity Control for Sea Level Rise */}
-            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
-              <div>
-                <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
-                <div className="space-y-2">
-                  <Slider
-                    value={seaLevelOpacity}
-                    onValueChange={(value) => {
-                      setSeaLevelOpacity(value)
-                      updateLayerSettings({ opacity: value[0] })
-                    }}
-                    max={100}
-                    step={1}
-                    className="w-full"
-                  />
-                  <span className="text-xs text-muted-foreground">{seaLevelOpacity[0]}%</span>
-                </div>
-              </div>
-            )}
-
-            {/* Temperature Controls - only show for temperature dataset */}
-            {selectedDataset === "temperature" && (
-              <div className="bg-red-500/10 p-4 rounded-lg border border-red-500/30">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium">🌡️ Temperature Anomaly Filter</label>
-                  <span className="text-lg font-bold text-red-400">
-                    {temperatureThreshold[0] === 0 ? 'All' : `≥${temperatureThreshold[0]}°C`}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <Slider
-                    value={temperatureThreshold}
-                    onValueChange={(value) => {
-                      setTemperatureThreshold(value)
-                      updateLayerSettings({ temperatureThreshold: value[0] })
-                    }}
-                    min={0}
-                    max={5}
-                    step={0.1}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>0°C (All)</span>
-                    <span>2.5°C</span>
-                    <span>5°C</span>
-                  </div>
-                  <div className="text-xs text-red-300 mt-2">
-                    NASA GISTEMP global surface temperature anomaly relative to 1951-1980 average. Heatmap shows all warming globally.
-                  </div>
-                </div>
-
-                {/* Layer Opacity */}
-                <div className="mt-4">
-                  <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
-                  <div className="space-y-2">
-                    <Slider
-                      value={seaLevelOpacity}
-                      onValueChange={(value) => {
-                        setSeaLevelOpacity(value)
-                        updateLayerSettings({ opacity: value[0] })
-                      }}
-                      max={100}
-                      step={1}
-                      className="w-full"
-                    />
-                    <span className="text-xs text-muted-foreground">{seaLevelOpacity[0]}%</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Urban Heat Island Controls - only show for urban_heat_island dataset */}
-            {selectedDataset === "urban_heat_island" && (
-              <>
-                <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium">🛰️ Land Surface Temperature</label>
-                  </div>
-                  <div className="text-xs text-green-300 mb-2">
-                    <strong>✅ REAL SATELLITE DATA</strong> - NASA MODIS LST
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-4">
-                    Using NASA POWER API for satellite-derived land surface temperature
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Layer Opacity */}
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Layer Opacity</label>
-                      <div className="space-y-2">
-                        <Slider
-                          value={urbanHeatOpacity}
-                          onValueChange={(value) => {
-                            setUrbanHeatOpacity(value)
-                            updateLayerSettings({ urbanHeatOpacity: value[0] })
-                          }}
-                          max={100}
-                          step={1}
-                          className="w-full"
-                        />
-                        <span className="text-xs text-muted-foreground">{urbanHeatOpacity[0]}%</span>
-                      </div>
-                    </div>
-
-                    {/* Temperature Range Legend */}
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Temperature Scale</label>
-                      <div className="space-y-1 text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-[#2166ac] rounded"></div>
-                          <span className="text-muted-foreground">Coolest (Blue)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-[#92c5de] rounded"></div>
-                          <span className="text-muted-foreground">Cool (Cyan)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-[#fddbca] rounded"></div>
-                          <span className="text-muted-foreground">Moderate (Beige)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-[#f4a582] rounded"></div>
-                          <span className="text-muted-foreground">Warm (Orange)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-[#b2182b] rounded"></div>
-                          <span className="text-muted-foreground">Hottest (Red)</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-2 italic">
-                          * Range varies by location and season
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Show Hotspots Toggle */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        defaultChecked={true}
-                        onChange={(e) => {
-                          updateLayerSettings({ showHotspots: e.target.checked })
-                        }}
-                        className="w-4 h-4 cursor-pointer"
-                      />
-                      <label className="text-sm font-medium">Show Heat Island Hotspots</label>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="text-xs text-muted-foreground space-y-2">
-                  <p><strong>Data Source:</strong> Landsat 8/9 Thermal Band</p>
-                  <p><strong>Processing:</strong> Digital Numbers → Radiance → Brightness Temperature → LST</p>
-                  <p><strong>Emissivity Correction:</strong> Applied using NDVI</p>
-                  <p><strong>Resolution:</strong> 30m (resampled from 100m thermal)</p>
-                </div>
-              </>
-            )}
-
-            {selectedLayer === "noaa_sea_level_rise" && selectedDataset === "sea_level_rise" && (
-              <>
-                <Separator />
-
-                {/* Border */}
-                <div className="mt-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <input
-                      type="checkbox"
-                      checked={showBorder}
-                      onChange={(e) => {
-                        setShowBorder(e.target.checked)
-                        updateLayerSettings({ showBorder: e.target.checked })
-                      }}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                    <label className="text-sm font-medium">Show Border</label>
-                  </div>
-
-                  {showBorder && (
-                    <div className="space-y-3 ml-6">
-                      <div>
-                        <label className="text-xs text-muted-foreground mb-1 block">Border color</label>
-                        <Select value={borderColor} onValueChange={(value) => {
-                          setBorderColor(value)
-                          updateLayerSettings({ borderColor: value })
-                        }}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cyan">Light Blue (Cyan)</SelectItem>
-                            <SelectItem value="white">White</SelectItem>
-                            <SelectItem value="black">Black</SelectItem>
-                            <SelectItem value="yellow">Yellow</SelectItem>
-                            <SelectItem value="red">Red</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <label className="text-xs text-muted-foreground mb-2 block">Width: {borderWidth[0]}px</label>
-                        <Slider
-                          value={borderWidth}
-                          onValueChange={(value) => {
-                            setBorderWidth(value)
-                            updateLayerSettings({ borderWidth: value[0] })
-                          }}
-                          max={5}
-                          step={1}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
           </TabsContent>
 
           <TabsContent value="reference" className="py-4 space-y-4">
@@ -563,7 +636,9 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onLayerSe
           </TabsContent>
 
         </Tabs>
-      </div>
+          </div>
+        </Panel>
+      </PanelGroup>
     </div>
   )
 }
