@@ -118,8 +118,12 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
           return
         }
 
-        // Dynamically import Leaflet ESM build
-        const L = await import('leaflet/dist/leaflet-src.esm.js')
+        // Dynamically import a single Leaflet instance everywhere
+        const L = (await import('leaflet')).default
+        // Ensure plugins like leaflet.heat can attach to the same global L
+        if (typeof window !== 'undefined') {
+          ;(window as any).L = L
+        }
 
         // Use location prop or default to Nassau County
         const center = location ? [location.center.lat, location.center.lng] : [40.7589, -73.9851]
@@ -196,7 +200,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
 
     const addSeaLevelLayer = async () => {
       try {
-        const L = await import('leaflet/dist/leaflet-src.esm.js')
+        const L = (await import('leaflet')).default
 
         // Remove existing sea level layer if present
         if (seaLevelLayerRef.current) {
@@ -308,12 +312,14 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
           temperatureLayerRef.current = null
         }
 
-        // Import Leaflet and heat plugin together
-        const [leafletModule, heatModule] = await Promise.all([
-          import('leaflet'),
-          import('leaflet.heat')
-        ]);
-        const L = leafletModule.default;
+        // Import Leaflet first and expose on window for the plugin
+        const leafletModule = await import('leaflet')
+        const L = leafletModule.default
+        if (typeof window !== 'undefined') {
+          ;(window as any).L = L
+        }
+        // Now load the heat plugin so it augments the same L
+        const heatModule = await import('leaflet.heat')
 
         console.log('✅ Leaflet loaded')
         console.log('✅ Leaflet.heat loaded')
@@ -604,6 +610,9 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
         }
 
         const L = (await import('leaflet')).default
+        if (typeof window !== 'undefined') {
+          ;(window as any).L = L
+        }
 
         // Get current map bounds to cover entire visible area
         const mapBounds = mapInstanceRef.current.getBounds()
@@ -722,6 +731,9 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
         }
 
         const L = (await import('leaflet')).default
+        if (typeof window !== 'undefined') {
+          ;(window as any).L = L
+        }
 
         // Get current map bounds
         const mapBounds = mapInstanceRef.current.getBounds()
