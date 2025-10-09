@@ -161,9 +161,10 @@ export function GISAnalysisApp() {
       console.log(`🌊 Fetching NOAA sea level rise data for ${location.name} at ${feet}ft...`);
 
       const bounds = location.bounds;
+      const layerType = layerSettings.displayStyle || 'depth'; // 'depth' or 'extent'
 
       const response = await fetch(
-        `http://localhost:3001/api/noaa/sea-level-rise?feet=${feet}&north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}`
+        `http://localhost:3001/api/noaa/sea-level-rise?feet=${feet}&north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}&layer=${layerType}`
       );
 
       const result = await response.json();
@@ -314,7 +315,8 @@ export function GISAnalysisApp() {
       enabledLayers: layerSettings.enabledLayers,
       hasEnabledLayers: !!layerSettings.enabledLayers,
       enabledLayersLength: layerSettings.enabledLayers?.length,
-      enabledLayersStr
+      enabledLayersStr,
+      displayStyle: layerSettings.displayStyle
     });
 
     // Fetch data for each enabled layer
@@ -342,7 +344,7 @@ export function GISAnalysisApp() {
       console.log('✅ Temperature projection is enabled, fetching NASA data...');
       fetchTemperatureProjection(projectionYear, climateScenario);
     }
-  }, [JSON.stringify(layerSettings.enabledLayers)]);
+  }, [JSON.stringify(layerSettings.enabledLayers), layerSettings.displayStyle]);
 
   // Debug: Log layerSettings changes
   useEffect(() => {

@@ -1183,7 +1183,7 @@ app.get('/api/modis/gibs-tiles', async (req, res) => {
 // NOAA Sea Level Rise endpoint
 app.get('/api/noaa/sea-level-rise', async (req, res) => {
   try {
-    const { feet = 3, north, south, east, west } = req.query;
+    const { feet = 3, north, south, east, west, layer = '1' } = req.query;
 
     // Validate parameters
     if (!north || !south || !east || !west) {
@@ -1194,8 +1194,11 @@ app.get('/api/noaa/sea-level-rise', async (req, res) => {
     }
 
     // Map feet to NOAA service
+    // Layer 0 = Extent only (simple boundary)
+    // Layer 1 = Depth grid (detailed depth information)
     const feetValue = parseInt(feet);
-    const serviceUrl = `https://coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${feetValue}ft/MapServer/0/query`;
+    const layerNum = layer === 'depth' || layer === '1' ? '1' : '0';
+    const serviceUrl = `https://coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${feetValue}ft/MapServer/${layerNum}/query`;
 
     console.log(`🌊 Fetching NOAA ${feetValue}ft sea level rise data...`);
 
