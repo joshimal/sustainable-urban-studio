@@ -35,7 +35,8 @@ const EnhancedLeafletViewer: React.FC<EnhancedLeafletViewerProps> = ({
   useEffect(() => {
     const initMap = async () => {
       // Dynamically import Leaflet to avoid SSR issues
-      const L = await import('leaflet');
+      const { loadLeaflet } = await import('@/utils/loadLeaflet');
+      const L: any = await loadLeaflet();
       await import('leaflet/dist/leaflet.css');
 
       // Fix for default markers
@@ -157,7 +158,8 @@ const EnhancedLeafletViewer: React.FC<EnhancedLeafletViewerProps> = ({
   };
 
   const addGISDataToMap = async (leafletMap: any, data: any) => {
-    const L = await import('leaflet');
+    const { loadLeaflet } = await import('@/utils/loadLeaflet');
+    const L: any = await loadLeaflet();
 
     // Clear existing layers
     leafletMap.eachLayer((layer: any) => {
@@ -358,7 +360,8 @@ const EnhancedLeafletViewer: React.FC<EnhancedLeafletViewerProps> = ({
   const updateBaseLayer = async () => {
     if (!map) return;
 
-    const L = await import('leaflet');
+    const { loadLeaflet } = await import('@/utils/loadLeaflet');
+    const L: any = await loadLeaflet();
     const baseLayers = getBaseLayers(L);
 
     // Remove existing tile layers

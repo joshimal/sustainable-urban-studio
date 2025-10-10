@@ -64,6 +64,8 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onProject
         enabledLayers: settings.enabledLayers ?? enabledLayers,
         layerOrder: settings.layerOrder ?? layerOrder,
         seaLevelOpacity: (settings.opacity ?? seaLevelOpacity[0]) / 100,
+        // Temperature opacity is provided as 0-100 from the slider; the map divides by 100
+        temperatureOpacity: settings.temperatureOpacity ?? temperatureOpacity[0],
         urbanHeatOpacity: (settings.urbanHeatOpacity ?? urbanHeatOpacity[0]) / 100,
         displayStyle: settings.displayStyle ?? displayStyle,
         showBorder: settings.showBorder ?? showBorder,
@@ -178,7 +180,7 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onProject
 
   return (
     <div
-      className="w-80 bg-card border-l border-gray-700 flex flex-col"
+      className="w-full min-w-[280px] max-w-[520px] h-full bg-card border-l border-gray-700 flex flex-col"
       onMouseDown={handleMouseDown}
       onTouchStart={handleMouseDown}
     >
@@ -330,25 +332,6 @@ export function LayerPanel({ selectedLayer, onClose, onSeaLevelChange, onProject
                             {seaLevelFeet === 5 && "High (~2100)"}
                             {seaLevelFeet === 6 && "Extreme (~2150)"}
                           </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Display Style */}
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Display style</label>
-                          <Select value={displayStyle} onValueChange={(value) => {
-                            setDisplayStyle(value)
-                            updateLayerSettings({ displayStyle: value })
-                          }}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="depth">Depth (Layer 1)</SelectItem>
-                              <SelectItem value="extent">Extent Only (Layer 0)</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </div>
 
                         <Separator />

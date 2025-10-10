@@ -31,5 +31,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": false
   },
-  "include": ["src/App.tsx", "src/main.tsx", "src/components/gis-analysis-app.tsx", "src/components/leaflet-map.tsx", "src/components/map-view.tsx", "src/components/layer-panel.tsx", "src/components/layer-list.tsx", "src/components/visualization-panel.tsx", "src/components/ui/**/*"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ]
 }

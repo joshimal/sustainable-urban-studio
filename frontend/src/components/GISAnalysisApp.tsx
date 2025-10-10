@@ -6,6 +6,7 @@ import { Input } from "./ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Layers, Search, Map, Plus, X, Trash2 } from "lucide-react"
 import { LayerPanel } from "./layer-panel"
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
 import { LeafletMap } from "./leaflet-map"
 
 // Location configurations
@@ -42,6 +43,7 @@ export function GISAnalysisApp() {
   const [selectedLocation, setSelectedLocation] = useState('west_long_island')
   const [selectedLayer, setSelectedLayer] = useState("noaa_sea_level_rise")
   const [layerPanelOpen, setLayerPanelOpen] = useState(true)
+  const [layoutVersion, setLayoutVersion] = useState(0)
   const [seaLevelRiseData, setSeaLevelRiseData] = useState(null)
   const [temperatureData, setTemperatureData] = useState(null)
   const [urbanHeatData, setUrbanHeatData] = useState(null)
@@ -472,51 +474,65 @@ export function GISAnalysisApp() {
 
 
       {/* Main Content Area */}
-      <div className="flex-1 flex">
-        {/* Map View */}
-        <div className="flex-1 relative">
-          <LeafletMap
-            location={LOCATIONS[selectedLocation]}
-            seaLevelRiseData={layerSettings.enabledLayers?.includes('sea_level_rise') ? seaLevelRiseData : null}
-            temperatureData={layerSettings.enabledLayers?.includes('temperature') ? temperatureData : null}
-            urbanHeatData={layerSettings.enabledLayers?.includes('urban_heat_island') ? urbanHeatData : null}
-            elevationData={layerSettings.enabledLayers?.includes('elevation') ? elevationData : null}
-            tempProjectionData={layerSettings.enabledLayers?.includes('temperature_projection') ? tempProjectionData : null}
-            layerSettings={layerSettings}
-            seaLevelFeet={seaLevelFeet}
-          />
+      <div className="flex-1">
+        <PanelGroup direction="horizontal" className="h-full flex">
+          <Panel defaultSize={70} minSize={30} onResize={() => setLayoutVersion(v => v + 1)}>
+            <div className="relative h-full">
+              <LeafletMap
+                location={LOCATIONS[selectedLocation]}
+                seaLevelRiseData={layerSettings.enabledLayers?.includes('sea_level_rise') ? seaLevelRiseData : null}
+                temperatureData={layerSettings.enabledLayers?.includes('temperature') ? temperatureData : null}
+                urbanHeatData={layerSettings.enabledLayers?.includes('urban_heat_island') ? urbanHeatData : null}
+                elevationData={layerSettings.enabledLayers?.includes('elevation') ? elevationData : null}
+                tempProjectionData={layerSettings.enabledLayers?.includes('temperature_projection') ? tempProjectionData : null}
+                layerSettings={layerSettings}
+                seaLevelFeet={seaLevelFeet}
+                resizeSignal={layoutVersion}
+              />
 
-          {/* Control Buttons */}
-          <div className="absolute top-4 right-4 flex gap-2 z-[1000] pointer-events-auto">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setLayerPanelOpen(!layerPanelOpen)}
-              className="flex items-center gap-2"
-            >
-              <Layers className="h-4 w-4" />
-              Layers
-            </Button>
-          </div>
-        </div>
+              {/* Control Buttons */}
+              <div className="absolute top-4 right-4 flex gap-2 z-[1000] pointer-events-auto">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setLayerPanelOpen(!layerPanelOpen)
+                    setTimeout(() => setLayoutVersion(v => v + 1), 50)
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Layers className="h-4 w-4" />
+                  Layers
+                </Button>
+              </div>
+            </div>
+          </Panel>
 
-        {/* Right Panel - Layer Controls */}
-        {layerPanelOpen && (
-          <LayerPanel
-            selectedLayer={selectedLayer}
-            onClose={() => setLayerPanelOpen(false)}
-            onSeaLevelChange={handleSeaLevelChange}
-            onProjectionYearChange={handleProjectionYearChange}
-            onClimateScenarioChange={handleClimateScenarioChange}
-            onLayerSettingsChange={(newSettings) => {
-              console.log('📥 GISAnalysisApp received layer settings:', newSettings);
-              setLayerSettings(newSettings);
-            }}
-            seaLevelFeet={seaLevelFeet}
-            projectionYear={projectionYear}
-            climateScenario={climateScenario}
-          />
-        )}
+          {layerPanelOpen && (
+            <>
+              <PanelResizeHandle className="w-1 bg-gray-700 hover:bg-blue-500 cursor-col-resize" />
+              <Panel defaultSize={30} minSize={20} onResize={() => setLayoutVersion(v => v + 1)}>
+                <LayerPanel
+                  selectedLayer={selectedLayer}
+                  onClose={() => {
+                    setLayerPanelOpen(false)
+                    setTimeout(() => setLayoutVersion(v => v + 1), 50)
+                  }}
+                  onSeaLevelChange={handleSeaLevelChange}
+                  onProjectionYearChange={handleProjectionYearChange}
+                  onClimateScenarioChange={handleClimateScenarioChange}
+                  onLayerSettingsChange={(newSettings) => {
+                    console.log('📥 GISAnalysisApp received layer settings:', newSettings);
+                    setLayerSettings(newSettings);
+                  }}
+                  seaLevelFeet={seaLevelFeet}
+                  projectionYear={projectionYear}
+                  climateScenario={climateScenario}
+                />
+              </Panel>
+            </>
+          )}
+        </PanelGroup>
       </div>
 
       {/* Save Map Dialog */}

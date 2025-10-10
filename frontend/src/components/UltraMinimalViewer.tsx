@@ -14,7 +14,8 @@ const UltraMinimalViewer: React.FC<UltraMinimalViewerProps> = ({
 
   useEffect(() => {
     const initMap = async () => {
-      const L = await import('leaflet');
+      const { loadLeaflet } = await import('@/utils/loadLeaflet');
+      const L: any = await loadLeaflet();
       await import('leaflet/dist/leaflet.css');
 
       const leafletMap = L.map(mapRef.current, {

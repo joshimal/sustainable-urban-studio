@@ -58,7 +58,8 @@ const ProfessionalSliderViewer: React.FC = () => {
     const initMap = async () => {
       try {
         console.log('🗺️ Initializing Leaflet map...');
-        const L = await import('leaflet');
+        const { loadLeaflet } = await import('@/utils/loadLeaflet');
+        const L: any = await loadLeaflet();
         await import('leaflet/dist/leaflet.css');
 
         delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -132,7 +133,8 @@ const ProfessionalSliderViewer: React.FC = () => {
   const updateMapVisualization = async () => {
     if (!map) return;
 
-    const L = await import('leaflet');
+    const { loadLeaflet } = await import('@/utils/loadLeaflet');
+    const L: any = await loadLeaflet();
 
     // Clear existing layers
     map.eachLayer((layer: any) => {

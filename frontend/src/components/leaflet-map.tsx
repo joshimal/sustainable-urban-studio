@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { loadLeaflet } from "@/utils/loadLeaflet"
 // Defer Leaflet import to runtime with explicit ESM build to avoid Vite export mismatches
 // We'll dynamically import inside useEffect
 
@@ -21,6 +22,7 @@ interface LeafletMapProps {
   elevationData?: any
   tempProjectionData?: any
   seaLevelFeet?: number
+  resizeSignal?: number
   layerSettings?: {
     selectedDataset?: string
     seaLevelEnabled?: boolean
@@ -32,11 +34,12 @@ interface LeafletMapProps {
     borderWidth?: number
     temperatureThreshold?: number
     urbanHeatOpacity?: number
+    layerOrder?: string[]
     enabledLayers?: string[]
   }
 }
 
-export function LeafletMap({ className, location, seaLevelRiseData, temperatureData, urbanHeatData, elevationData, tempProjectionData, layerSettings, seaLevelFeet = 2 }: LeafletMapProps) {
+export function LeafletMap({ className, location, seaLevelRiseData, temperatureData, urbanHeatData, elevationData, tempProjectionData, layerSettings, seaLevelFeet = 2, resizeSignal }: LeafletMapProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
@@ -49,6 +52,111 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
   const tempProjectionLayerRef = useRef<any>(null)
   const climateLayerRef = useRef<any>(null)
   const lastOpacityRef = useRef<number>(0.2)
+
+  // Pane names for consistent ordering
+  const PANES: Record<string, string> = {
+    sea_level_rise: 'pane_sea_level',
+    elevation: 'pane_elevation',
+    temperature_projection: 'pane_temp_projection',
+    temperature: 'pane_temperature',
+    urban_heat_island: 'pane_urban_heat'
+  }
+
+  // Ensure panes exist and apply blend modes
+  const ensurePanes = (L: any) => {
+    if (!mapInstanceRef.current) return
+
+    const map = mapInstanceRef.current
+
+    const createIfMissing = (name: string) => {
+      if (!map.getPane(name)) {
+        map.createPane(name)
+      }
+      return map.getPane(name)
+    }
+
+    // Sea level tiles beneath other overlays
+    const seaPane = createIfMissing(PANES.sea_level_rise)
+    if (seaPane) {
+      seaPane.style.zIndex = '450'
+      seaPane.style.mixBlendMode = 'normal'
+    }
+
+    // Elevation under temperature overlays
+    const elevPane = createIfMissing(PANES.elevation)
+    if (elevPane) {
+      elevPane.style.zIndex = '455'
+      elevPane.style.mixBlendMode = 'multiply'
+    }
+
+    // Temperature (current) overlay
+    const tempPane = createIfMissing(PANES.temperature)
+    if (tempPane) {
+      tempPane.style.zIndex = '460'
+      tempPane.style.mixBlendMode = 'screen'
+    }
+
+    // Urban heat image overlay
+    const uhiPane = createIfMissing(PANES.urban_heat_island)
+    if (uhiPane) {
+      uhiPane.style.zIndex = '465'
+      uhiPane.style.mixBlendMode = 'screen'
+    }
+
+    // Future temperature projection circles on top
+    const projPane = createIfMissing(PANES.temperature_projection)
+    if (projPane) {
+      projPane.style.zIndex = '470'
+      projPane.style.mixBlendMode = 'normal'
+    }
+  }
+
+  // Reorder panes based on layerOrder from settings
+  const applyLayerOrderToPanes = () => {
+    if (!mapInstanceRef.current) return
+    const order = layerSettings?.layerOrder || [
+      'sea_level_rise',
+      'elevation',
+      'temperature_projection',
+      'temperature',
+      'urban_heat_island'
+    ]
+    // Start near the Leaflet overlay zIndex (400+). Assign increasing z-indexes
+    const baseZ = 450
+    order.forEach((layerId, idx) => {
+      const paneName = (PANES as any)[layerId]
+      const pane = paneName ? mapInstanceRef.current.getPane(paneName) : null
+      if (pane) {
+        pane.style.zIndex = String(baseZ + idx * 5)
+      }
+    })
+
+    // Also bring active layer refs to front following order
+    const bring = (ref: any) => {
+      if (ref && ref.current && typeof ref.current.bringToFront === 'function') {
+        ref.current.bringToFront()
+      }
+    }
+    order.forEach((layerId) => {
+      switch (layerId) {
+        case 'sea_level_rise':
+          bring(seaLevelLayerRef)
+          break
+        case 'elevation':
+          bring(elevationLayerRef)
+          break
+        case 'temperature_projection':
+          bring(tempProjectionLayerRef)
+          break
+        case 'temperature':
+          bring(temperatureLayerRef)
+          break
+        case 'urban_heat_island':
+          bring(urbanHeatLayerRef)
+          break
+      }
+    })
+  }
 
   // Debug: Log props changes
   useEffect(() => {
@@ -92,6 +200,15 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
     mapInstanceRef.current.setView([location.center.lat, location.center.lng], location.zoom)
   }, [location])
 
+  // Invalidate map size when container layout changes
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.invalidateSize(true)
+      } catch {}
+    }
+  }, [resizeSignal])
+
   useEffect(() => {
     if (!isMounted) {
       return
@@ -118,8 +235,8 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
           return
         }
 
-        // Dynamically import Leaflet ESM build
-        const L = await import('leaflet/dist/leaflet-src.esm.js')
+        // Dynamically import Leaflet with proper default export
+        const L: any = await loadLeaflet()
 
         // Use location prop or default to Nassau County
         const center = location ? [location.center.lat, location.center.lng] : [40.7589, -73.9851]
@@ -142,6 +259,9 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
           worldCopyJump: false,
           zoomAnimation: true
         })
+
+        // Ensure panes exist
+        ensurePanes(L)
 
         // Add dark tile layer
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
@@ -196,7 +316,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
 
     const addSeaLevelLayer = async () => {
       try {
-        const L = await import('leaflet/dist/leaflet-src.esm.js')
+        const L: any = await loadLeaflet()
 
         // Remove existing sea level layer if present
         if (seaLevelLayerRef.current) {
@@ -207,9 +327,17 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
 
         // Add NOAA tile layer if sea level rise is enabled
         if (layerSettings?.enabledLayers?.includes('sea_level_rise')) {
+          // Skip sea level tiles for inland locations
+          if (location && location.hasCoastalRisk === false) {
+            console.log('⚠️ Location has no coastal risk, skipping sea level tiles');
+            return;
+          }
           const opacity = layerSettings?.seaLevelOpacity ?? 0.6
 
           console.log(`✅ Sea level rise is enabled! Loading NOAA tiles for ${seaLevelFeet}ft with opacity ${opacity}`)
+
+          // Ensure panes/z-index exist before adding
+          ensurePanes(L)
 
           // Use NOAA's cached tile service directly (works for all feet values)
           // Add cache buster to force reload
@@ -219,12 +347,18 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
               opacity: opacity,
               attribution: '© NOAA Office for Coastal Management',
               className: 'noaa-sea-level-layer',
+              pane: PANES.sea_level_rise,
+              zIndex: 460,
               maxZoom: 16,  // Tiles cached down to level 16
               updateWhenZooming: false,
               updateWhenIdle: true,
               keepBuffer: 2
             }
           )
+
+          tileLayer.on('tileerror', (e: any) => {
+            console.error('❌ NOAA tile load error:', e?.error || e)
+          })
 
           seaLevelLayerRef.current = tileLayer.addTo(mapInstanceRef.current)
           console.log('✅ Sea level tile layer added to map successfully');
@@ -235,7 +369,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
           const borderWidth = layerSettings?.borderWidth ?? 1
 
           setTimeout(() => {
-            const pane = mapInstanceRef.current.getPane('tilePane')
+            const pane = mapInstanceRef.current.getPane(PANES.sea_level_rise)
             const layers = pane?.querySelectorAll('.noaa-sea-level-layer')
             layers?.forEach((layer: any) => {
               // Color adjustment: shift bright blue to #123B5F
@@ -257,6 +391,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
 
               layer.style.filter = filters
             })
+            applyLayerOrderToPanes()
           }, 100)
         }
       } catch (err) {
@@ -265,7 +400,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
     }
 
     addSeaLevelLayer()
-  }, [seaLevelFeet, layerSettings?.seaLevelOpacity, layerSettings?.selectedDataset, layerSettings?.displayStyle, layerSettings?.showBorder, layerSettings?.borderColor, layerSettings?.borderWidth])
+  }, [seaLevelFeet, layerSettings?.seaLevelOpacity, layerSettings?.enabledLayers, layerSettings?.displayStyle, layerSettings?.showBorder, layerSettings?.borderColor, layerSettings?.borderWidth])
 
   // Add temperature layer when data changes
   useEffect(() => {
@@ -309,11 +444,12 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
         }
 
         // Import Leaflet and heat plugin together
-        const [leafletModule, heatModule] = await Promise.all([
-          import('leaflet'),
+        const [L, heatModule] = await Promise.all([
+          loadLeaflet(),
           import('leaflet.heat')
         ]);
-        const L = leafletModule.default;
+        // Ensure plugin attaches to window.L if needed
+        if (typeof window !== 'undefined') (window as any).L = L;
 
         console.log('✅ Leaflet loaded')
         console.log('✅ Leaflet.heat loaded')
@@ -341,6 +477,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
         console.log('Map bounds:', { minLat, maxLat, minLng, maxLng })
 
         // Extract points from temperature data for heatmap
+        const threshold = (layerSettings?.temperatureThreshold ?? 0)
         const heatPoints = temperatureData.features
           .filter((feature: any) => {
             const coords = feature.geometry?.coordinates
@@ -348,13 +485,15 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
             if (!coords || coords.length < 2) return false
             const lon = coords[0]
             const lat = coords[1]
+            const anomaly = feature.properties?.anomaly ?? 0
 
             return typeof lon === 'number' &&
                    typeof lat === 'number' &&
                    !isNaN(lon) &&
                    !isNaN(lat) &&
                    lat >= minLat && lat <= maxLat &&
-                   lon >= minLng && lon <= maxLng
+                   lon >= minLng && maxLng >= lon &&
+                   anomaly >= threshold
           })
           .map((feature: any) => {
             const coords = feature.geometry.coordinates
@@ -400,12 +539,17 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
         console.log('✅ Creating temperature heatmap with', heatPoints.length, 'points');
 
         // Create heatmap layer with finer, smoother appearance
+        // Use opacity from settings if present; fallback to 0.7
+        const tempOpacity = (typeof (layerSettings as any)?.temperatureOpacity === 'number'
+          ? (layerSettings as any).temperatureOpacity
+          : 70) / 100
         temperatureLayerRef.current = heatLayerFn(heatPoints, {
           radius: 25,        // Larger radius for smoother appearance
           blur: 35,          // More blur for smooth gradients
           maxZoom: 18,       // Works at all zoom levels
           max: 1.0,
-          minOpacity: 0.5,
+          minOpacity: Math.max(0.05, Math.min(1, tempOpacity)),
+          pane: PANES.temperature,
           gradient: {
             0.0: '#053061',   // Deep navy blue (coldest)
             0.15: '#2166ac',  // Blue
@@ -427,7 +571,33 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
     }
 
     addTemperatureLayer()
-  }, [temperatureData, layerSettings?.enabledLayers])
+
+    // Refresh on map pan/zoom with debounce
+    let tempUpdateTimeout: NodeJS.Timeout | null = null
+
+    const handleTempMapMove = () => {
+      if (layerSettings?.enabledLayers?.includes('temperature')) {
+        if (tempUpdateTimeout) {
+          clearTimeout(tempUpdateTimeout)
+        }
+        tempUpdateTimeout = setTimeout(() => {
+          console.log('🗺️ Map movement ended, updating temperature heatmap...')
+          addTemperatureLayer()
+        }, 300)
+      }
+    }
+
+    mapInstanceRef.current.on('moveend', handleTempMapMove)
+
+    return () => {
+      if (tempUpdateTimeout) {
+        clearTimeout(tempUpdateTimeout)
+      }
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.off('moveend', handleTempMapMove)
+      }
+    }
+  }, [temperatureData, layerSettings?.enabledLayers, layerSettings?.temperatureThreshold, (layerSettings as any)?.temperatureOpacity])
 
   // Update Urban Heat Island opacity only (separate from layer creation to prevent re-rendering)
   useEffect(() => {
@@ -603,7 +773,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
           urbanHeatLayerRef.current = null
         }
 
-        const L = (await import('leaflet')).default
+        const L: any = await loadLeaflet()
 
         // Get current map bounds to cover entire visible area
         const mapBounds = mapInstanceRef.current.getBounds()
@@ -633,6 +803,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
         const imageOverlay = L.imageOverlay(canvas.toDataURL(), bounds, {
           opacity: opacity,
           interactive: false,
+          pane: PANES.urban_heat_island,
           className: 'urban-heat-overlay'
         })
 
@@ -721,7 +892,7 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
           elevationLayerRef.current = null
         }
 
-        const L = (await import('leaflet')).default
+        const L: any = await loadLeaflet()
 
         // Get current map bounds
         const mapBounds = mapInstanceRef.current.getBounds()
@@ -848,6 +1019,96 @@ export function LeafletMap({ className, location, seaLevelRiseData, temperatureD
 
     addElevationLayer()
   }, [elevationData, layerSettings?.enabledLayers])
+
+  // Add Temperature Projection layer
+  useEffect(() => {
+    console.log('🌡️ ==== TEMP PROJECTION EFFECT TRIGGERED ====', {
+      hasMap: !!mapInstanceRef.current,
+      hasData: !!tempProjectionData,
+      dataFeatures: tempProjectionData?.features?.length,
+      enabledLayers: layerSettings?.enabledLayers,
+      isEnabled: layerSettings?.enabledLayers?.includes('temperature_projection')
+    })
+
+    if (!mapInstanceRef.current) {
+      console.log('❌ No map instance for temp projection')
+      return
+    }
+
+    // Clean up if not enabled
+    if (!layerSettings?.enabledLayers?.includes('temperature_projection')) {
+      console.log('🧹 Temp projection not enabled, cleaning up layer')
+      if (tempProjectionLayerRef.current) {
+        mapInstanceRef.current.removeLayer(tempProjectionLayerRef.current)
+        tempProjectionLayerRef.current = null
+      }
+      return
+    }
+
+    if (!tempProjectionData) {
+      console.log('⏳ Temp projection enabled but waiting for data...')
+      return
+    }
+
+    const addTempProjectionLayer = async () => {
+      try {
+        console.log('🌡️ Starting to add temperature projection layer...')
+
+        // Remove existing layer
+        if (tempProjectionLayerRef.current) {
+          console.log('Removing existing temp projection layer')
+          mapInstanceRef.current.removeLayer(tempProjectionLayerRef.current)
+          tempProjectionLayerRef.current = null
+        }
+
+        const L: any = await loadLeaflet()
+
+        // Create heatmap-style circles for temperature projections
+        const circles = tempProjectionData.features.map((feature: any) => {
+          const coords = feature.geometry.coordinates
+          const tempAnomaly = feature.properties.temperature_anomaly || 0
+
+          // Color scale: blue (cold) -> yellow -> orange -> red (hot)
+          let color
+          if (tempAnomaly < 1) {
+            color = '#3b82f6' // blue
+          } else if (tempAnomaly < 2) {
+            color = '#eab308' // yellow
+          } else if (tempAnomaly < 3) {
+            color = '#f97316' // orange
+          } else {
+            color = '#ef4444' // red
+          }
+
+          return L.circle([coords[1], coords[0]], {
+            radius: 8000, // 8km radius
+            fillColor: color,
+            fillOpacity: 0.6,
+            color: color,
+            weight: 0,
+            pane: PANES.temperature_projection,
+            interactive: false
+          })
+        })
+
+        // Create layer group
+        const layerGroup = L.layerGroup(circles)
+        layerGroup.addTo(mapInstanceRef.current)
+        tempProjectionLayerRef.current = layerGroup
+
+        console.log(`✅ Added ${circles.length} temperature projection circles`)
+      } catch (err) {
+        console.error('❌ Error adding temp projection layer:', err)
+      }
+    }
+
+    addTempProjectionLayer()
+  }, [tempProjectionData, layerSettings?.enabledLayers])
+
+  // Re-apply ordering when layer order changes
+  useEffect(() => {
+    applyLayerOrderToPanes()
+  }, [JSON.stringify(layerSettings?.layerOrder)])
 
   return (
     <div className={`relative h-full ${className}`}>

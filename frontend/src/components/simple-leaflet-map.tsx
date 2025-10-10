@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react"
+import React, { useEffect, useRef } from "react"
+import { loadLeaflet } from "@/utils/loadLeaflet"
 
 export function SimpleLeafletMap() {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -8,7 +9,7 @@ export function SimpleLeafletMap() {
 
     const initMap = async () => {
       try {
-        const L = await import("leaflet")
+        const L: any = await loadLeaflet()
         
         const map = L.map(mapRef.current!, {
           center: [40.7589, -73.9851],
@@ -52,6 +53,8 @@ export function SimpleLeafletMap() {
     />
   )
 }
+
+
 
 
 
