@@ -116,103 +116,147 @@ export function LayerPanel({
 
   const activeEnabledLayers = onlyControls ? enabledLayers : localSettings.enabledLayers;
 
-  const LayerList = () => (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground mb-3">
-        Check layers to enable • Drag to reorder
-      </p>
+  const LayerList = () => {
+    const layerRowClass = (enabled: boolean) =>
+      `flex items-center gap-2 p-2 rounded border transition-colors group ${
+        enabled
+          ? 'bg-blue-500/10 border-blue-500/50 hover:bg-blue-500/20'
+          : 'bg-muted/30 border-border/50 hover:bg-muted/50'
+      }`
 
-      <div className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded border border-border/50 transition-colors group" title="Sea Level Rise (NOAA)">
-        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move flex-shrink-0" />
-        <input
-          type="checkbox"
-          id="layer-sea-level"
-          checked={localSettings.enabledLayers.includes('sea_level_rise')}
-          onChange={(e) => toggleLayer('sea_level_rise', e.target.checked)}
-          className="w-4 h-4 cursor-pointer flex-shrink-0"
-        />
-        <label
-          htmlFor="layer-sea-level"
-          className="text-sm flex-1 cursor-pointer truncate"
-        >
-          Sea Level Rise (NOAA)
-        </label>
-        <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0"></div>
-      </div>
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground mb-3">
+          Check layers to enable • Drag to reorder
+        </p>
 
-      <div className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded border border-border/50 transition-colors group" title="Elevation (USGS 3DEP)">
-        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move flex-shrink-0" />
-        <input
-          type="checkbox"
-          id="layer-elevation"
-          checked={localSettings.enabledLayers.includes('elevation')}
-          onChange={(e) => toggleLayer('elevation', e.target.checked)}
-          className="w-4 h-4 cursor-pointer flex-shrink-0"
-        />
-        <label
-          htmlFor="layer-elevation"
-          className="text-sm flex-1 cursor-pointer truncate"
+        <div
+          className={layerRowClass(localSettings.enabledLayers.includes('sea_level_rise'))}
+          title="Sea Level Rise (NOAA)"
         >
-          Elevation (USGS 3DEP)
-        </label>
-        <div className="w-3 h-3 rounded-full bg-cyan-500 flex-shrink-0"></div>
-      </div>
+          <GripVertical
+            className={`h-4 w-4 cursor-move flex-shrink-0 ${
+              localSettings.enabledLayers.includes('sea_level_rise') ? 'text-blue-400' : 'text-muted-foreground'
+            }`}
+          />
+          <input
+            type="checkbox"
+            id="layer-sea-level"
+            checked={localSettings.enabledLayers.includes('sea_level_rise')}
+            onChange={(e) => toggleLayer('sea_level_rise', e.target.checked)}
+            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
+          />
+          <label
+            htmlFor="layer-sea-level"
+            className="text-sm flex-1 cursor-pointer truncate"
+          >
+            Sea Level Rise (NOAA)
+          </label>
+          <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0"></div>
+        </div>
 
-      <div className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded border border-border/50 transition-colors group" title="Future Temperature (NASA NEX-GDDP)">
-        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move flex-shrink-0" />
-        <input
-          type="checkbox"
-          id="layer-temp-projection"
-          checked={localSettings.enabledLayers.includes('temperature_projection')}
-          onChange={(e) => toggleLayer('temperature_projection', e.target.checked)}
-          className="w-4 h-4 cursor-pointer flex-shrink-0"
-        />
-        <label
-          htmlFor="layer-temp-projection"
-          className="text-sm flex-1 cursor-pointer truncate"
+        <div
+          className={layerRowClass(localSettings.enabledLayers.includes('elevation'))}
+          title="Elevation (USGS 3DEP)"
         >
-          Future Temperature (NASA NEX-GDDP)
-        </label>
-        <div className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0"></div>
-      </div>
+          <GripVertical
+            className={`h-4 w-4 cursor-move flex-shrink-0 ${
+              localSettings.enabledLayers.includes('elevation') ? 'text-blue-400' : 'text-muted-foreground'
+            }`}
+          />
+          <input
+            type="checkbox"
+            id="layer-elevation"
+            checked={localSettings.enabledLayers.includes('elevation')}
+            onChange={(e) => toggleLayer('elevation', e.target.checked)}
+            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
+          />
+          <label
+            htmlFor="layer-elevation"
+            className="text-sm flex-1 cursor-pointer truncate"
+          >
+            Elevation (USGS 3DEP)
+          </label>
+          <div className="w-3 h-3 rounded-full bg-cyan-500 flex-shrink-0"></div>
+        </div>
 
-      <div className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded border border-border/50 transition-colors group" title="Current Surface Temperature (NASA GISTEMP)">
-        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move flex-shrink-0" />
-        <input
-          type="checkbox"
-          id="layer-temperature"
-          checked={localSettings.enabledLayers.includes('temperature')}
-          onChange={(e) => toggleLayer('temperature', e.target.checked)}
-          className="w-4 h-4 cursor-pointer flex-shrink-0"
-        />
-        <label
-          htmlFor="layer-temperature"
-          className="text-sm flex-1 cursor-pointer truncate"
+        <div
+          className={layerRowClass(localSettings.enabledLayers.includes('temperature_projection'))}
+          title="Future Temperature (NASA NEX-GDDP)"
         >
-          Current Surface Temperature (NASA GISTEMP)
-        </label>
-        <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></div>
-      </div>
+          <GripVertical
+            className={`h-4 w-4 cursor-move flex-shrink-0 ${
+              localSettings.enabledLayers.includes('temperature_projection') ? 'text-blue-400' : 'text-muted-foreground'
+            }`}
+          />
+          <input
+            type="checkbox"
+            id="layer-temp-projection"
+            checked={localSettings.enabledLayers.includes('temperature_projection')}
+            onChange={(e) => toggleLayer('temperature_projection', e.target.checked)}
+            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
+          />
+          <label
+            htmlFor="layer-temp-projection"
+            className="text-sm flex-1 cursor-pointer truncate"
+          >
+            Future Temperature (NASA NEX-GDDP)
+          </label>
+          <div className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0"></div>
+        </div>
 
-      <div className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded border border-border/50 transition-colors group" title="Urban Heat Island (NASA MODIS LST)">
-        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move flex-shrink-0" />
-        <input
-          type="checkbox"
-          id="layer-urban-heat"
-          checked={localSettings.enabledLayers.includes('urban_heat_island')}
-          onChange={(e) => toggleLayer('urban_heat_island', e.target.checked)}
-          className="w-4 h-4 cursor-pointer flex-shrink-0"
-        />
-        <label
-          htmlFor="layer-urban-heat"
-          className="text-sm flex-1 cursor-pointer truncate"
+        <div
+          className={layerRowClass(localSettings.enabledLayers.includes('temperature'))}
+          title="Current Surface Temperature (NASA GISTEMP)"
         >
-          Urban Heat Island (NASA MODIS LST)
-        </label>
-        <div className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0"></div>
+          <GripVertical
+            className={`h-4 w-4 cursor-move flex-shrink-0 ${
+              localSettings.enabledLayers.includes('temperature') ? 'text-blue-400' : 'text-muted-foreground'
+            }`}
+          />
+          <input
+            type="checkbox"
+            id="layer-temperature"
+            checked={localSettings.enabledLayers.includes('temperature')}
+            onChange={(e) => toggleLayer('temperature', e.target.checked)}
+            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
+          />
+          <label
+            htmlFor="layer-temperature"
+            className="text-sm flex-1 cursor-pointer truncate"
+          >
+            Current Surface Temperature (NASA GISTEMP)
+          </label>
+          <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></div>
+        </div>
+
+        <div
+          className={layerRowClass(localSettings.enabledLayers.includes('urban_heat_island'))}
+          title="Urban Heat Island (NASA MODIS LST)"
+        >
+          <GripVertical
+            className={`h-4 w-4 cursor-move flex-shrink-0 ${
+              localSettings.enabledLayers.includes('urban_heat_island') ? 'text-blue-400' : 'text-muted-foreground'
+            }`}
+          />
+          <input
+            type="checkbox"
+            id="layer-urban-heat"
+            checked={localSettings.enabledLayers.includes('urban_heat_island')}
+            onChange={(e) => toggleLayer('urban_heat_island', e.target.checked)}
+            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
+          />
+          <label
+            htmlFor="layer-urban-heat"
+            className="text-sm flex-1 cursor-pointer truncate"
+          >
+            Urban Heat Island (NASA MODIS LST)
+          </label>
+          <div className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0"></div>
+        </div>
       </div>
-    </div>
-  );
+    )
+  }
 
   const LayerControls = () => (
     <div className="space-y-4">
