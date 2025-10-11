@@ -603,7 +603,7 @@ export function LeafletMap({
         }
       `}</style>
 
-      <div className="absolute bottom-4 left-2 z-[2000] bg-black/80 text-white p-2 text-xs rounded">
+      <div className="absolute bottom-4 left-2 z-[2000] bg-black/80 text-white px-3 py-2.5 text-xs rounded">
         <div>Map Ready: {isMapReady ? '✅' : '❌'}</div>
         <div>Sea Level: {seaLevelLayerRef.current ? '✅' : '❌'}</div>
         <div>Elevation: {elevationLayerRef.current ? '✅' : '❌'}</div>

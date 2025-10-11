@@ -118,14 +118,14 @@ export function LayerPanel({
 
   const LayerList = () => {
     const layerRowClass = (enabled: boolean) =>
-      `flex items-center gap-2 p-2 rounded border transition-colors group ${
+      `flex items-center gap-3 px-3 py-2.5 rounded border transition-colors group ${
         enabled
           ? 'bg-blue-500/10 border-blue-500/50 hover:bg-blue-500/20'
           : 'bg-muted/30 border-border/50 hover:bg-muted/50'
       }`
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         <p className="text-xs text-muted-foreground mb-3">
           Check layers to enable • Drag to reorder
         </p>
