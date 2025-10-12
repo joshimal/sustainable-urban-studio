@@ -65,7 +65,9 @@ export function GISAnalysisApp() {
     borderColor: 'cyan',
     borderWidth: 1,
     temperatureThreshold: 3.2,
-    urbanHeatOpacity: 0.2,
+    urbanHeatOpacity: 0.7,
+    urbanHeatIntensity: 0.5,
+    tempProjectionOpacity: 0.6,
     temperatureOpacity: 0.5,
     elevationOpacity: 0.5
   })
@@ -83,31 +85,17 @@ export function GISAnalysisApp() {
   ])
 
   const handleLayerSettingsChange = useCallback((newSettings: any) => {
-    console.log('📥 Parent received settings update:', newSettings);
-    console.log('📥 Parent received enabledLayers:', newSettings.enabledLayers);
-    
     if (isFirstRenderRef.current && (!newSettings.enabledLayers || newSettings.enabledLayers.length === 0)) {
-      console.log('📥 Ignoring empty initial state');
       isFirstRenderRef.current = false;
       return;
     }
     
-    console.log('📥 Setting layerSettings state (merging with existing)...');
     setLayerSettings(prev => ({
       ...prev,
       ...newSettings
     }));
     isFirstRenderRef.current = false;
   }, []);
-
-  useEffect(() => {
-    console.log('🎯 Parent layerSettings updated:', layerSettings);
-    console.log('🎯 Parent layerSettings.enabledLayers:', layerSettings.enabledLayers);
-    console.log('🎯 Is array?', Array.isArray(layerSettings.enabledLayers));
-    console.log('🎯 Length:', layerSettings.enabledLayers?.length);
-    const shouldShow = Array.isArray(layerSettings.enabledLayers) && layerSettings.enabledLayers.length > 0;
-    console.log('🎯 Should show controls panel:', shouldShow);
-  }, [layerSettings]);
 
   const fetchSeaLevelRiseData = async (feet: number) => {
     try {
@@ -276,13 +264,10 @@ export function GISAnalysisApp() {
   }, [])
 
   const hasEnabledLayers = Array.isArray(layerSettings.enabledLayers) && layerSettings.enabledLayers.length > 0;
-  
-  console.log('🎨 RENDER - hasEnabledLayers:', hasEnabledLayers);
-  console.log('🎨 RENDER - layerSettings.enabledLayers:', layerSettings.enabledLayers);
 
   return (
     <div className="h-screen bg-background text-foreground flex">
-      {/* Panel 1 - Climate Analysis - FIXED WIDTH */}
+      {/* Panel 1 - Climate Analysis */}
       <div className="w-80 bg-card border-r border-border flex flex-col flex-shrink-0">
         <div className="p-4 border-b border-border">
           <h1 className="text-lg font-semibold mb-3">Climate Analysis</h1>
@@ -369,7 +354,7 @@ export function GISAnalysisApp() {
         </div>
       </div>
 
-      {/* Panel 2 - Controls/Data - SMOOTH SLIDE TRANSITION */}
+      {/* Panel 2 - Controls/Data */}
       <div 
         className={`bg-card border-r border-border flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
           hasEnabledLayers ? 'w-80' : 'w-0 border-0'
@@ -436,7 +421,7 @@ export function GISAnalysisApp() {
         </div>
       </div>
 
-      {/* Map - AUTOMATICALLY TRANSITIONS WITH FLEXBOX */}
+      {/* Map */}
       <div className="flex-1 relative transition-all duration-300 ease-in-out">
         <LeafletMap
           location={LOCATIONS[selectedLocation]}

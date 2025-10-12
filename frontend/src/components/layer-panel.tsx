@@ -48,6 +48,8 @@ export function LayerPanel({
     borderWidth: 1,
     temperatureThreshold: 0,
     urbanHeatOpacity: 20,
+    urbanHeatIntensity: 50,
+    tempProjectionOpacity: 60,
     temperatureOpacity: 50,
     elevationOpacity: 50
   })
@@ -118,14 +120,14 @@ export function LayerPanel({
 
   const LayerList = () => {
     const layerRowClass = (enabled: boolean) =>
-      `flex items-center gap-3 px-3 py-2.5 rounded border transition-colors group ${
+      `flex items-center gap-2 p-2 rounded border transition-colors group ${
         enabled
           ? 'bg-blue-500/10 border-blue-500/50 hover:bg-blue-500/20'
           : 'bg-muted/30 border-border/50 hover:bg-muted/50'
       }`
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <p className="text-xs text-muted-foreground mb-3">
           Check layers to enable • Drag to reorder
         </p>
@@ -351,6 +353,24 @@ export function LayerPanel({
           
           {!collapsedCards['temperature_projection'] && (
             <div className="p-4 pt-0 space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-muted-foreground">Layer Opacity</label>
+                  <span className="text-xs font-medium">{Math.round((localSettings.tempProjectionOpacity || 0.6) * 100)}%</span>
+                </div>
+                <Slider
+                  value={[Math.round((localSettings.tempProjectionOpacity || 0.6) * 100)]}
+                  onValueChange={(value) => {
+                    setLocalSettings(prev => ({ ...prev, tempProjectionOpacity: value[0] / 100 }));
+                    sendPartialUpdate({ tempProjectionOpacity: value[0] / 100 });
+                  }}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs text-muted-foreground">Projection Year</label>

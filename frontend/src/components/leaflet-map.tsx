@@ -1,4 +1,4 @@
-// COMPLETE FIXED VERSION - Replace your entire leaflet-map.tsx with this
+// ENHANCED VERSION - Hot colors for UHI + Dark map + Better Future Temperature
 
 "use client"
 
@@ -23,7 +23,6 @@ interface LeafletMapProps {
   tempProjectionData?: any
   seaLevelFeet?: number
   resizeSignal?: number
-  uhiDate?: string
   layerSettings?: {
     selectedDataset?: string
     seaLevelEnabled?: boolean
@@ -35,6 +34,8 @@ interface LeafletMapProps {
     borderWidth?: number
     temperatureThreshold?: number
     urbanHeatOpacity?: number
+    urbanHeatIntensity?: number
+    tempProjectionOpacity?: number
     layerOrder?: string[]
     enabledLayers?: string[]
     [k: string]: any
@@ -51,13 +52,13 @@ export function LeafletMap({
   tempProjectionData,
   layerSettings,
   seaLevelFeet = 2,
-  resizeSignal,
-  uhiDate
+  resizeSignal
 }: LeafletMapProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const [isMapReady, setIsMapReady] = useState(false)
+  const [uhiLoadingState, setUhiLoadingState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
 
   const mapInstanceRef = useRef<any>(null)
   const mapRef = useRef<HTMLDivElement>(null)
@@ -92,86 +93,9 @@ export function LeafletMap({
 
     createIfMissing(PANES.sea_level_rise, '450', 'normal')
     createIfMissing(PANES.elevation, '452', 'multiply')
+    createIfMissing(PANES.temperature_projection, '455', 'screen')
     createIfMissing(PANES.temperature, '460', 'screen')
-    createIfMissing(PANES.urban_heat_island, '465', 'screen')
-    createIfMissing(PANES.temperature_projection, '470', 'normal')
-  }
-
-  // Helper: YYYY-MM-DD for NASA GIBS TIME param (defaults to today)
-  const getUHIDate = () => {
-    if (uhiDate && /^\d{4}-\d{2}-\d{2}$/.test(uhiDate)) return uhiDate
-    const d = new Date()
-    const y = d.getFullYear()
-    const m = `${d.getMonth() + 1}`.padStart(2, '0')
-    const day = `${d.getDate()}`.padStart(2, '0')
-    return `${y}-${m}-${day}`
-  }
-
-  // NASA GIBS (EPSG:3857) WMTS REST pattern for MODIS LST Day (1km)
-  // Using GoogleMapsCompatible_Level7 tiles (max native zoom for this layer)
-  const gibsWMTSUrl = (layerId: string, timeISO: string) =>
-    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/all/${layerId}/default/${timeISO}/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png`
-
-  const latLngToTile = (lat: number, lng: number, zoom: number) => {
-    const scale = Math.pow(2, zoom)
-    const x = Math.min(scale - 1, Math.max(0, Math.floor(((lng + 180) / 360) * scale)))
-    const sinLat = Math.sin((lat * Math.PI) / 180)
-    const rawY = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale
-    const y = Math.min(scale - 1, Math.max(0, Math.floor(rawY)))
-    return { x, y, z: zoom }
-  }
-
-  const buildDateCandidates = (baseISO: string) => {
-    const base = new Date(baseISO + 'T00:00:00Z')
-    if (Number.isNaN(base.valueOf())) return [baseISO]
-
-    const offsets = [0, 1, 3, 7, 14, 30, 60, 90, 180]
-    const seen = new Set<string>()
-    const dates: string[] = []
-
-    for (const days of offsets) {
-      const candidate = new Date(base)
-      candidate.setUTCDate(candidate.getUTCDate() - days)
-      const iso = candidate.toISOString().slice(0, 10)
-      if (!seen.has(iso)) {
-        seen.add(iso)
-        dates.push(iso)
-      }
-    }
-
-    return dates
-  }
-
-  const findAvailableGibsDate = async (
-    layerId: string,
-    dateCandidates: string[],
-    lat: number,
-    lng: number
-  ) => {
-    const zoomCandidates = [7, 6, 5, 4, 3, 2, 1, 0]
-
-    for (const candidate of dateCandidates) {
-      const template = gibsWMTSUrl(layerId, candidate)
-
-      for (const zoom of zoomCandidates) {
-        const coords = latLngToTile(lat, lng, zoom)
-        const url = template
-          .replaceAll('{z}', `${zoom}`)
-          .replace('{x}', `${coords.x}`)
-          .replace('{y}', `${coords.y}`)
-
-        try {
-          const response = await fetch(url, { method: 'HEAD' })
-          if (response.ok) {
-            return { date: candidate, template, maxNativeZoom: zoom }
-          }
-        } catch (err) {
-          console.warn('Failed to probe GIBS tile availability:', err)
-        }
-      }
-    }
-
-    return null
+    createIfMissing(PANES.urban_heat_island, '465', 'normal')
   }
 
   useEffect(() => {
@@ -195,7 +119,6 @@ export function LeafletMap({
 
     const initMap = async () => {
       try {
-        // wait for container
         let attempts = 0
         while (!mapRef.current && attempts < 50) {
           await new Promise(r => setTimeout(r, 50))
@@ -226,7 +149,8 @@ export function LeafletMap({
 
         ensurePanes(L)
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        // Dark basemap for better heat visualization
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
           attribution: '© CartoDB',
           subdomains: 'abcd',
           maxZoom: 19
@@ -238,6 +162,7 @@ export function LeafletMap({
           mapInstanceRef.current = leafletMap
           setIsLoading(false)
           setIsMapReady(true)
+          console.log('✅ Map initialized and ready')
         }
       } catch (err) {
         console.error('Map initialization error:', err)
@@ -282,6 +207,7 @@ export function LeafletMap({
             { opacity, attribution: '© NOAA', pane: PANES.sea_level_rise, maxZoom: 16 }
           )
           seaLevelLayerRef.current = tileLayer.addTo(mapInstanceRef.current)
+          console.log('✅ Sea level layer added')
         }
       } catch (err) {
         console.error('Error adding sea level rise layer:', err)
@@ -351,6 +277,7 @@ export function LeafletMap({
             1.0: '#67001f'
           }
         }).addTo(mapInstanceRef.current)
+        console.log('✅ Temperature layer added')
       } catch (err) {
         console.error('❌ Error adding temperature layer:', err)
       }
@@ -359,7 +286,7 @@ export function LeafletMap({
     addTemperatureLayer()
   }, [temperatureData, layerSettings?.enabledLayers, layerSettings?.temperatureThreshold, (layerSettings as any)?.temperatureOpacity, isMapReady])
 
-  // ✅ Urban Heat Island Layer — NASA GIBS MODIS LST Day (1km) with native zoom clamp + smooth upscale
+  // ✅ Urban Heat Island - Using backend API with proper red=hot heatmap
   useEffect(() => {
     if (!mapInstanceRef.current || !isMapReady) return
 
@@ -367,13 +294,26 @@ export function LeafletMap({
       if (urbanHeatLayerRef.current) {
         mapInstanceRef.current.removeLayer(urbanHeatLayerRef.current)
         urbanHeatLayerRef.current = null
+        setUhiLoadingState('idle')
       }
       return
     }
 
     const addUrbanHeatLayer = async () => {
       try {
+        setUhiLoadingState('loading')
+        console.log('🌡️ Loading Urban Heat Island layer from backend API...')
+
         const L: any = await loadLeaflet()
+        await import('leaflet.heat')
+        const LeafletWithHeat = (window as any).L || L
+
+        if (!LeafletWithHeat.heatLayer) {
+          console.error('❌ leaflet.heat not loaded')
+          setUhiLoadingState('error')
+          return
+        }
+
         if (urbanHeatLayerRef.current) {
           mapInstanceRef.current.removeLayer(urbanHeatLayerRef.current)
           urbanHeatLayerRef.current = null
@@ -381,69 +321,86 @@ export function LeafletMap({
 
         ensurePanes(L)
 
-        const mapCenter = mapInstanceRef.current.getCenter()
-        const centerLat = mapCenter?.lat ?? (location?.center.lat ?? 0)
-        const centerLng = mapCenter?.lng ?? (location?.center.lng ?? 0)
-
-        const LAYER_ID = "MODIS_Terra_Land_Surface_Temp_Day_TES"
-        const preferredDate = getUHIDate()
-        const candidates = buildDateCandidates(preferredDate)
-        const availability = await findAvailableGibsDate(LAYER_ID, candidates, centerLat, centerLng)
-
-        const finalDate = availability?.date || preferredDate
-        const template = availability?.template || gibsWMTSUrl(LAYER_ID, finalDate)
-        const MAX_NATIVE_Z = availability?.maxNativeZoom ?? 7 // default to published native zoom
-
-        if (!availability) {
-          console.warn(`⚠️ Falling back to requested UHI date ${preferredDate}; probe did not find a valid tile`)
-        } else if (availability.date !== preferredDate) {
-          console.log(`ℹ️ UHI using fallback date ${availability.date} (preferred ${preferredDate})`)
+        // Fetch data from backend API
+        const bounds = location?.bounds
+        if (!bounds) {
+          console.error('No bounds available')
+          setUhiLoadingState('error')
+          return
         }
 
-        if (availability && availability.maxNativeZoom !== 7) {
-          console.log(`ℹ️ UHI limiting native zoom to ${availability.maxNativeZoom} based on available tiles`)
+        const response = await fetch(
+          `http://localhost:3001/api/modis/lst?north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}&resolution=0.02`
+        )
+        const result = await response.json()
+
+        if (!result.success || !result.data?.features) {
+          console.warn('⚠️ No UHI data from backend')
+          setUhiLoadingState('error')
+          return
         }
 
-        const uhiOpacity = layerSettings?.urbanHeatOpacity ?? 0.45
+        console.log(`✅ Received ${result.data.features.length} temperature points`)
 
-        // TileLayer subclass that clamps z and maps x/y to parent tile when over-zooming
-        const UhiLayer = L.TileLayer.extend({
-          getTileUrl: function (coords: any) {
-            const z = Math.min(coords.z, MAX_NATIVE_Z)
-            const dz = coords.z - z
-            const x = dz > 0 ? (coords.x >> dz) : coords.x
-            const y = dz > 0 ? (coords.y >> dz) : coords.y
-            return template
-              .replaceAll("{z}", `${z}`)
-              .replace("{x}", `${x}`)
-              .replace("{y}", `${y}`)
-          }
+        // Convert temperature data to heatmap points [lat, lng, intensity]
+        const heatPoints = result.data.features.map((feature: any) => {
+          const [lon, lat] = feature.geometry.coordinates
+          const temp = feature.properties.lst || feature.properties.temperature || 20
+
+          // Map temperature to intensity (0-1)
+          // Typical LST range: 15°C (cool) to 35°C (hot)
+          const intensity = Math.min(1.0, Math.max(0.0, (temp - 15) / 20))
+
+          return [lat, lon, intensity]
         })
 
-        const uhi = new UhiLayer(undefined, {
+        if (heatPoints.length === 0) {
+          console.warn('⚠️ No heat points to display')
+          setUhiLoadingState('error')
+          return
+        }
+
+        const uhiOpacity = layerSettings?.urbanHeatOpacity ?? 0.7
+        const uhiIntensity = layerSettings?.urbanHeatIntensity ?? 0.5
+
+        // Create heatmap with proper red=hot, blue=cold gradient
+        urbanHeatLayerRef.current = LeafletWithHeat.heatLayer(heatPoints, {
+          radius: 35 + (uhiIntensity * 25), // 35-60 pixels
+          blur: 45 + (uhiIntensity * 35), // 45-80 pixels
+          maxZoom: 18,
+          max: 1.0,
+          minOpacity: uhiOpacity * 0.3,
           pane: PANES.urban_heat_island,
-          opacity: uhiOpacity,
-          maxZoom: 19,               // allow deep map zoom; tiles upscale smoothly
-          maxNativeZoom: MAX_NATIVE_Z,
-          tileSize: 256,
-          updateWhenZooming: true,
-          updateWhenIdle: true,
-          crossOrigin: true,
-          tms: false,
-          className: "gibs-smooth-raster"
-        })
+          gradient: {
+            0.0: '#0571b0',    // dark blue - very cold
+            0.2: '#92c5de',    // light blue - cold
+            0.4: '#f7f7f7',    // white - moderate
+            0.6: '#fdb863',    // light orange - warm
+            0.8: '#e08214',    // orange - hot
+            1.0: '#b30000'     // dark red - very hot
+          }
+        }).addTo(mapInstanceRef.current)
 
-        urbanHeatLayerRef.current = uhi.addTo(mapInstanceRef.current)
-        console.log(`✅ UHI (MODIS LST Day) added for TIME=${finalDate}, maxNativeZoom=${MAX_NATIVE_Z}`)
+        urbanHeatLayerRef.current.setOpacity(uhiOpacity)
+        setUhiLoadingState('loaded')
+        console.log('✅ UHI heatmap layer added with proper red=hot colors')
+
       } catch (err) {
-        console.error('Error adding Urban Heat Island (GIBS LST) layer:', err)
+        console.error('❌ Error adding Urban Heat Island layer:', err)
+        setUhiLoadingState('error')
       }
     }
 
     addUrbanHeatLayer()
-  }, [layerSettings?.enabledLayers, layerSettings?.urbanHeatOpacity, isMapReady, uhiDate])
+  }, [
+    layerSettings?.enabledLayers,
+    layerSettings?.urbanHeatOpacity,
+    layerSettings?.urbanHeatIntensity,
+    isMapReady,
+    location
+  ])
 
-  // Elevation Layer (unchanged logic)
+  // Elevation Layer
   useEffect(() => {
     if (!mapInstanceRef.current || !isMapReady) return
 
@@ -455,10 +412,7 @@ export function LeafletMap({
       return
     }
 
-    if (!elevationData) {
-      console.log('⏳ Waiting for elevation data...')
-      return
-    }
+    if (!elevationData) return
 
     const addElevationLayer = async () => {
       try {
@@ -533,6 +487,7 @@ export function LeafletMap({
           interactive: false,
           pane: PANES.elevation
         }).addTo(mapInstanceRef.current)
+        console.log('✅ Elevation layer added')
       } catch (err) {
         console.error('❌ Error adding elevation layer:', err)
       }
@@ -541,7 +496,7 @@ export function LeafletMap({
     addElevationLayer()
   }, [elevationData, layerSettings?.enabledLayers, isMapReady])
 
-  // Temperature Projection Layer (unchanged logic)
+  // ✅✅ Temperature Projection - Enhanced with heatmap style
   useEffect(() => {
     if (!mapInstanceRef.current || !isMapReady) return
 
@@ -553,71 +508,120 @@ export function LeafletMap({
       return
     }
 
-    if (!tempProjectionData) {
-      console.log('⏳ Waiting for temperature projection data...')
-      return
-    }
+    if (!tempProjectionData) return
 
     const addTempProjectionLayer = async () => {
       try {
+        console.log('🌡️ Adding temperature projection heatmap...')
+        
+        if (tempProjectionLayerRef.current) {
+          mapInstanceRef.current.removeLayer(tempProjectionLayerRef.current)
+          tempProjectionLayerRef.current = null
+        }
+
         const L: any = await loadLeaflet()
+        await import('leaflet.heat')
+        const LeafletWithHeat = (window as any).L || L
 
-        const circles = tempProjectionData.features.map((feature: any) => {
-          const coords = feature.geometry.coordinates
-          const tempAnomaly = feature.properties.tempAnomaly || feature.properties.temperature_anomaly || 0
+        if (!LeafletWithHeat.heatLayer) {
+          console.error('❌ leaflet.heat not loaded')
+          return
+        }
 
-          let color
-          if (tempAnomaly < 1) color = '#3b82f6'
-          else if (tempAnomaly < 2) color = '#eab308'
-          else if (tempAnomaly < 3) color = '#f97316'
-          else color = '#ef4444'
+        const bounds = mapInstanceRef.current.getBounds()
 
-          return L.circle([coords[1], coords[0]], {
-            radius: 5000,
-            fillColor: color,
-            fillOpacity: 0.4,
-            color: color,
-            weight: 1,
-            pane: PANES.temperature_projection,
-            interactive: false
+        // Convert projection data to heatmap points
+        const heatPoints = tempProjectionData.features
+          .filter((f: any) => {
+            const coords = f.geometry?.coordinates
+            if (!coords || coords.length < 2) return false
+            const [lon, lat] = coords
+            return bounds.contains([lat, lon])
           })
-        })
+          .map((f: any) => {
+            const [lon, lat] = f.geometry.coordinates
+            const tempAnomaly = f.properties.tempAnomaly || f.properties.temperature_anomaly || 0
+            
+            // Map temperature anomaly to intensity (0-1)
+            // Assume range: 0°C to 5°C anomaly
+            const intensity = Math.min(1.0, Math.max(0.0, tempAnomaly / 5.0))
+            
+            return [lat, lon, intensity]
+          })
 
-        const layerGroup = L.layerGroup(circles)
-        layerGroup.addTo(mapInstanceRef.current)
-        tempProjectionLayerRef.current = layerGroup
+        if (heatPoints.length === 0) {
+          console.warn('⚠️ No temperature projection points in view')
+          return
+        }
+
+        console.log(`✅ Creating temp projection heatmap with ${heatPoints.length} points`)
+
+        // Get opacity from settings (comes as 0-1 from layer panel)
+        const projOpacity = (layerSettings as any)?.tempProjectionOpacity ?? 0.6
+
+        tempProjectionLayerRef.current = LeafletWithHeat.heatLayer(heatPoints, {
+          radius: 50,
+          blur: 70,
+          maxZoom: 18,
+          max: 0.8,  // Lower max to make colors more visible
+          minOpacity: 0.4,  // Higher minOpacity for visibility
+          pane: PANES.temperature_projection,
+          gradient: {
+            0.0: '#0571b0',    // dark blue - low warming
+            0.25: '#92c5de',   // light blue
+            0.4: '#ffffbf',    // pale yellow - moderate
+            0.6: '#fc8d59',    // orange - high
+            0.8: '#d7301f',    // red - very high
+            1.0: '#7f0000'     // dark red - extreme
+          }
+        }).addTo(mapInstanceRef.current)
+
+        // Set the layer opacity
+        tempProjectionLayerRef.current.setOpacity(projOpacity)
+        console.log(`✅ Temperature projection heatmap added with opacity ${projOpacity}`)
       } catch (err) {
         console.error('❌ Error adding temp projection layer:', err)
       }
     }
 
     addTempProjectionLayer()
-  }, [tempProjectionData, layerSettings?.enabledLayers, isMapReady])
+  }, [tempProjectionData, layerSettings?.enabledLayers, (layerSettings as any)?.tempProjectionOpacity, isMapReady])
 
   return (
     <div className={`relative h-full ${className}`}>
-      {/* Smooth raster hint for browsers (no styled-jsx in Vite) */}
       <style>{`
-        .gibs-smooth-raster {
-          image-rendering: auto !important; /* prefer bilinear/cubic over nearest */
+        .uhi-heat-layer {
+          image-rendering: auto !important;
         }
       `}</style>
 
-      <div className="absolute bottom-4 left-2 z-[2000] bg-black/80 text-white px-3 py-2.5 text-xs rounded">
-        <div>Map Ready: {isMapReady ? '✅' : '❌'}</div>
+      {/* Debug Panel */}
+      <div className="absolute bottom-4 left-2 z-[2000] bg-black/80 text-white px-3 py-2.5 text-xs rounded space-y-1">
+        <div>Map: {isMapReady ? '✅' : '⏳'}</div>
         <div>Sea Level: {seaLevelLayerRef.current ? '✅' : '❌'}</div>
         <div>Elevation: {elevationLayerRef.current ? '✅' : '❌'}</div>
         <div>Temp Proj: {tempProjectionLayerRef.current ? '✅' : '❌'}</div>
         <div>Temperature: {temperatureLayerRef.current ? '✅' : '❌'}</div>
-        <div>Urban Heat: {urbanHeatLayerRef.current ? '✅' : '❌'}</div>
-        <div>Enabled: {layerSettings?.enabledLayers?.join(', ') || 'none'}</div>
+        <div className={`${uhiLoadingState === 'loading' ? 'text-yellow-400' : uhiLoadingState === 'loaded' ? 'text-green-400' : ''}`}>
+          Urban Heat: {
+            uhiLoadingState === 'idle' ? '❌' :
+            uhiLoadingState === 'loading' ? '⏳ Loading...' :
+            uhiLoadingState === 'loaded' ? '✅' : '⚠️ Error'
+          }
+        </div>
+        {layerSettings?.urbanHeatOpacity !== undefined && (
+          <div className="text-yellow-400">UHI Opacity: {Math.round((layerSettings.urbanHeatOpacity ?? 0) * 100)}%</div>
+        )}
+        {layerSettings?.urbanHeatIntensity !== undefined && (
+          <div className="text-orange-400">UHI Intensity: {Math.round((layerSettings.urbanHeatIntensity ?? 0) * 100)}%</div>
+        )}
       </div>
 
       <div
         ref={mapRef}
         className="absolute inset-0"
         style={{
-          backgroundColor: '#f3f4f6',
+          backgroundColor: '#1a1a1a',
           cursor: 'grab',
           touchAction: 'none',
           userSelect: 'none',
