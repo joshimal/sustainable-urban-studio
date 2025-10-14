@@ -1,5 +1,10 @@
 import { GISAnalysisApp } from './components/GISAnalysisApp'
+import { ClimateProvider } from './contexts/ClimateContext'
 
 export default function App() {
-  return <GISAnalysisApp />
+  return (
+    <ClimateProvider>
+      <GISAnalysisApp />
+    </ClimateProvider>
+  )
 }

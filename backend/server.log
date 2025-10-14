@@ -1,0 +1,46 @@
+[dotenv@17.2.3] injecting env (2) from .env -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+❌ Database initialization failed: 
+🚀 Backend server running on port 3001
+📊 GIS Data Integration endpoints available at /api/gis
+🗺️  Supported data sources:
+   - Natural Earth Data: /api/gis/naturalearth
+   - OpenStreetMap/Geofabrik: /api/gis/geofabrik
+   - Census TIGER: /api/gis/census
+   - Municipal Open Data: /api/gis/municipal
+   - Microsoft Buildings: /api/gis/microsoft-buildings
+   - FEMA Sea Level Rise: /api/gis/fema-sea-level-rise
+🌊 NOAA Sea Level Rise: /api/noaa/sea-level-rise
+🏔️ USGS Elevation: /api/usgs/elevation
+🌡️ NASA Temperature Projection: /api/nasa/temperature-projection
+🌡️ Proxying temperature projection request: 2070, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.85017679415775&south=40.53572049118794&east=-73.4041213989258&west=-74.05162811279298&year=2070&scenario=rcp45&resolution=8&use_real_data=true
+🏔️ Generating elevation data for bounds...
+✅ Generated 400 elevation points
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error
+🌡️ Proxying temperature projection request: 2050, scenario rcp45, area 0.2°², resolution 8...
+📡 Fetching from: http://localhost:8081/api/climate/temperature-projection?north=40.83589191603279&south=40.52136804570545&east=-73.22696685791017&west=-73.87447357177736&year=2050&scenario=rcp45&resolution=8&use_real_data=true
+❌ NASA temperature projection error: Error

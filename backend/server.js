@@ -27,6 +27,16 @@ const { initializeDatabase, getProgressStatus } = require('./utils/database');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const NOAA_CDO_TOKEN = process.env.NOAA_CDO_TOKEN || process.env.NOAA_TOKEN || '';
+const NASA_API_KEY = process.env.NASA_API_KEY || '';
+
+const logEnvWarnings = () => {
+  if (!NOAA_CDO_TOKEN) {
+    console.warn('⚠️  NOAA_CDO_TOKEN is not set; NOAA climate endpoints will return 400 errors.');
+  }
+  if (!NASA_API_KEY) {
+    console.warn('⚠️  NASA_API_KEY is not set; NASA POWER requests may be rate-limited.');
+  }
+};
 
 // Middleware
 app.use(helmet());
@@ -70,6 +80,53 @@ const createUploadsDir = async () => {
   } catch (error) {
     console.log('Uploads directory already exists');
   }
+};
+
+// Generate simulated sea level rise flood zones
+const generateSimulatedFloodZones = (north, south, east, west, feet) => {
+  const features = [];
+  const gridSize = 50; // 50x50 grid for full coverage
+  const latStep = (north - south) / gridSize;
+  const lonStep = (east - west) / gridSize;
+
+  // Cover entire map area with varying flood risk
+  for (let lat = south; lat < north; lat += latStep) {
+    for (let lon = west; lon < east; lon += lonStep) {
+      // Create varying depth across the map for visualization
+      // Distance from south/east edges (higher risk near coast simulation)
+      const distFromSouth = (lat - south) / (north - south);
+      const distFromEast = (east - lon) / (east - west);
+      const coastalProximity = Math.min(distFromSouth, distFromEast);
+
+      // Vary depth based on position and sea level rise
+      // Add some randomness for realistic variation
+      const baseDepth = feet * (1 - coastalProximity * 0.5);
+      const variation = (Math.random() - 0.5) * feet * 0.3;
+      const depth = Math.max(0.1, baseDepth + variation);
+
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [lon + lonStep/2, lat + latStep/2]
+        },
+        properties: {
+          depth: parseFloat(depth.toFixed(2)),
+          gridcode: Math.floor(depth),
+          feet: feet
+        }
+      });
+    }
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features: features,
+    properties: {
+      source: 'Simulated Sea Level Rise Data',
+      feet: feet
+    }
+  };
 };
 
 // Health check
@@ -1122,11 +1179,12 @@ app.get('/api/nasa/temperature', async (req, res) => {
 });
 
 // NASA MODIS Land Surface Temperature endpoint (REAL satellite data)
+// Proxy to Python climate service for H3 hexagon format
 app.get('/api/modis/lst', async (req, res) => {
   try {
-    const { north, south, east, west, date, resolution = 0.05 } = req.query;
+    const { north, south, east, west, date, resolution } = req.query;
 
-    console.log('🛰️ Fetching REAL NASA MODIS LST data...');
+    console.log('🛰️ Fetching MODIS LST data with H3 hexagons...');
 
     const bounds = {
       north: parseFloat(north) || 41,
@@ -1135,22 +1193,65 @@ app.get('/api/modis/lst', async (req, res) => {
       west: parseFloat(west) || -74
     };
 
-    const data = await modisLSTService.getRegionalLSTData(bounds, {
-      date: date,
-      resolution: parseFloat(resolution)
-    });
+    // Calculate viewport area for dynamic resolution
+    const latSpan = Math.abs(bounds.north - bounds.south);
+    const lonSpan = Math.abs(bounds.east - bounds.west);
+    const viewportArea = latSpan * lonSpan;
 
-    res.json({
-      success: true,
-      data: data,
-      metadata: {
-        bounds: bounds,
-        date: date || new Date().toISOString().split('T')[0],
-        resolution: `${resolution}° × ${resolution}°`,
-        source: 'NASA MODIS/POWER',
-        data_type: 'real satellite data'
-      }
-    });
+    // Dynamic H3 resolution based on viewport size
+    let h3Resolution;
+    const parsedResolution = resolution ? parseInt(resolution) : null;
+
+    // Use parsed resolution if valid (4-10), otherwise calculate dynamically
+    if (parsedResolution && parsedResolution >= 4 && parsedResolution <= 10) {
+      h3Resolution = parsedResolution;
+    } else if (viewportArea < 5) {
+      h3Resolution = 8;  // City level
+    } else if (viewportArea < 50) {
+      h3Resolution = 7;  // Regional
+    } else if (viewportArea < 200) {
+      h3Resolution = 6;  // State level
+    } else {
+      h3Resolution = 5;  // Multi-state
+    }
+
+    console.log(`🌡️ Generating MODIS LST data: date ${date}, area ${viewportArea.toFixed(1)}°², H3 resolution ${h3Resolution}...`);
+
+    // Call Python service directly via exec (Flask routing is broken)
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+
+    const pythonScript = `
+import sys
+sys.path.insert(0, '/app/services')
+from urban_heat_island import UrbanHeatIslandService
+import json
+
+service = UrbanHeatIslandService()
+bounds = {
+    'north': ${bounds.north},
+    'south': ${bounds.south},
+    'east': ${bounds.east},
+    'west': ${bounds.west}
+}
+result = service.get_heat_island_data(bounds, None, ${h3Resolution})
+print(json.dumps({'success': True, 'data': result}))
+`;
+
+    try {
+      const { stdout } = await execAsync(`docker exec urban-studio-qgis python3 -c '${pythonScript.replace(/'/g, "'\\''")}'`);
+      const result = JSON.parse(stdout);
+      console.log(`✅ Generated ${result.data?.features?.length || 0} heat island hexagons`);
+      res.json(result);
+    } catch (error) {
+      console.error('❌ Error calling Python service:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate heat island data'
+      });
+    }
+
   } catch (error) {
     console.error('Error fetching MODIS LST data:', error);
     res.status(500).json({
@@ -1183,69 +1284,34 @@ app.get('/api/modis/gibs-tiles', async (req, res) => {
 });
 
 // NOAA Sea Level Rise endpoint
-app.get('/api/noaa/sea-level-rise', async (req, res) => {
+// NOAA Sea Level Rise Tile Proxy
+app.get('/api/tiles/noaa-slr/:feet/:z/:x/:y.png', async (req, res) => {
   try {
-    const { feet = 3, north, south, east, west, layer = '1' } = req.query;
+    const { feet, z, x, y } = req.params;
 
-    // Validate parameters
-    if (!north || !south || !east || !west) {
-      return res.status(400).json({
-        success: false,
-        error: 'Bounding box coordinates required (north, south, east, west)'
-      });
-    }
+    // NOAA Sea Level Rise tile service URL
+    const noaaUrl = `https://coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${feet}ft/MapServer/tile/${z}/${y}/${x}`;
 
-    // Map feet to NOAA service
-    // Layer 0 = Extent only (simple boundary)
-    // Layer 1 = Depth grid (detailed depth information)
-    const feetValue = parseInt(feet);
-    const layerNum = layer === 'depth' || layer === '1' ? '1' : '0';
-    const serviceUrl = `https://coast.noaa.gov/arcgis/rest/services/dc_slr/slr_${feetValue}ft/MapServer/${layerNum}/query`;
+    console.log(`🌊 Proxying NOAA SLR tile: ${feet}ft, z${z}/${x}/${y}`);
 
-    console.log(`🌊 Fetching NOAA ${feetValue}ft sea level rise data...`);
-
-    // Build query parameters for NOAA ArcGIS
-    const params = {
-      f: 'geojson',
-      where: '1=1',
-      outFields: '*',
-      returnGeometry: 'true',
-      spatialRel: 'esriSpatialRelIntersects',
-      geometry: JSON.stringify({
-        xmin: parseFloat(west),
-        ymin: parseFloat(south),
-        xmax: parseFloat(east),
-        ymax: parseFloat(north),
-        spatialReference: { wkid: 4326 }
-      }),
-      geometryType: 'esriGeometryEnvelope',
-      inSR: '4326',
-      outSR: '4326'
-    };
-
-    const noaaResponse = await axios.get(serviceUrl, {
-      params,
-      timeout: 15000
-    });
-
-    console.log(`✅ NOAA returned ${noaaResponse.data.features?.length || 0} features`);
-
-    res.json({
-      success: true,
-      data: noaaResponse.data,
-      metadata: {
-        feet: feetValue,
-        bounds: { north, south, east, west },
-        timestamp: new Date().toISOString()
+    const response = await axios.get(noaaUrl, {
+      responseType: 'arraybuffer',
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
       }
     });
 
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    res.send(response.data);
+
   } catch (error) {
-    console.error('❌ NOAA fetch error:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    console.error('❌ NOAA tile error:', error.message);
+    // Return transparent 1x1 PNG on error
+    const transparent = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    res.set('Content-Type', 'image/png');
+    res.send(transparent);
   }
 });
 
@@ -1323,10 +1389,14 @@ app.get('/api/usgs/elevation', async (req, res) => {
   }
 });
 
-// NASA Temperature Projection endpoint
+// NASA Temperature Projection Endpoint - Proxy to Python Climate Service
+// This endpoint proxies requests to the Python climate service which fetches
+// real data from NASA NEX-GDDP-CMIP6 on AWS S3
+const CLIMATE_SERVICE_URL = process.env.CLIMATE_SERVICE_URL || 'http://urban-studio-qgis:5000';
+
 app.get('/api/nasa/temperature-projection', async (req, res) => {
   try {
-    const { north, south, east, west, year = 2050, scenario = 'rcp45' } = req.query;
+    const { north, south, east, west, year = 2050, scenario = 'rcp45', resolution, use_real_data, zoom } = req.query;
 
     if (!north || !south || !east || !west) {
       return res.status(400).json({
@@ -1335,69 +1405,87 @@ app.get('/api/nasa/temperature-projection', async (req, res) => {
       });
     }
 
-    console.log(`🌡️ Generating temperature projection for ${year}, scenario ${scenario}...`);
-
-    // Temperature increase scenarios based on RCP pathways
-    const scenarios = {
-      rcp26: { baseline: 14.5, increase2050: 1.5, increase2100: 2.0 },  // Low emissions
-      rcp45: { baseline: 14.5, increase2050: 2.0, increase2100: 3.2 },  // Moderate
-      rcp85: { baseline: 14.5, increase2050: 2.5, increase2100: 4.8 }   // High emissions
-    };
-
-    const config = scenarios[scenario] || scenarios.rcp45;
-    const yearInt = parseInt(year);
-    const yearProgress = Math.max(0, Math.min(1, (yearInt - 2025) / (2100 - 2025)));
-    const projectedIncrease = config.increase2050 + (config.increase2100 - config.increase2050) * yearProgress;
-
-    // Generate temperature grid
-    const tempData = {
-      type: 'FeatureCollection',
-      features: [],
-      properties: {
-        source: 'NASA NEX-GDDP-CMIP6 (Simulated)',
-        scenario: scenario,
-        year: yearInt,
-        baselinePeriod: '1986-2005',
-        projectedIncrease: parseFloat(projectedIncrease.toFixed(2))
+    // Dynamic resolution based on map zoom level to keep hexagons same visual size
+    // Leaflet zoom levels typically range from 1 (world) to 18 (building)
+    // H3 resolution ranges from 0 (huge hexagons) to 15 (tiny hexagons)
+    //
+    // Mapping: Higher zoom = higher H3 resolution (smaller hexagons)
+    // Increased by 1-2 levels for smaller hexagons
+    // Zoom  1-3:  H3 res 3 (large hexagons, ~350km)
+    // Zoom  4-5:  H3 res 4 (medium hexagons, ~100km)
+    // Zoom  6-7:  H3 res 5 (small hexagons, ~35km)
+    // Zoom  8-9:  H3 res 6 (smaller hexagons, ~10km)
+    // Zoom 10-11: H3 res 7 (tiny hexagons, ~5km)
+    // Zoom 12-13: H3 res 8 (very tiny hexagons, ~1.5km)
+    // Zoom 14+:   H3 res 9 (extremely tiny hexagons, ~500m)
+    let dynamicResolution;
+    if (resolution) {
+      dynamicResolution = parseInt(resolution);
+    } else if (zoom) {
+      const zoomLevel = parseInt(zoom);
+      if (zoomLevel <= 3) {
+        dynamicResolution = 3;
+      } else if (zoomLevel <= 5) {
+        dynamicResolution = 4;
+      } else if (zoomLevel <= 7) {
+        dynamicResolution = 5;
+      } else if (zoomLevel <= 9) {
+        dynamicResolution = 6;
+      } else if (zoomLevel <= 11) {
+        dynamicResolution = 7;
+      } else if (zoomLevel <= 13) {
+        dynamicResolution = 8;
+      } else {
+        dynamicResolution = 9;
       }
-    };
+    } else {
+      // Fallback to area-based if zoom not provided
+      const latSpan = Math.abs(parseFloat(north) - parseFloat(south));
+      const lonSpan = Math.abs(parseFloat(east) - parseFloat(west));
+      const viewportArea = latSpan * lonSpan;
 
-    const latStep = (parseFloat(north) - parseFloat(south)) / 15;
-    const lonStep = (parseFloat(east) - parseFloat(west)) / 15;
-
-    for (let lat = parseFloat(south); lat < parseFloat(north); lat += latStep) {
-      for (let lon = parseFloat(west); lon < parseFloat(east); lon += lonStep) {
-        // Vary temperature by latitude and urban effects
-        const latEffect = (lat - 35) * 0.2; // Cooler in north
-        const urbanEffect = Math.random() * 2; // 0-2°C urban heat island
-        const tempAnomaly = projectedIncrease + latEffect + urbanEffect + (Math.random() - 0.5) * 0.5;
-
-        tempData.features.push({
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [lon, lat]
-          },
-          properties: {
-            tempAnomaly: parseFloat(tempAnomaly.toFixed(2)),
-            tempAnomalyF: parseFloat((tempAnomaly * 1.8).toFixed(2)),
-            baseline: config.baseline,
-            projected: parseFloat((config.baseline + tempAnomaly).toFixed(2))
-          }
-        });
+      if (viewportArea < 5) {
+        dynamicResolution = 8;
+      } else if (viewportArea < 50) {
+        dynamicResolution = 7;
+      } else if (viewportArea < 200) {
+        dynamicResolution = 6;
+      } else if (viewportArea < 1000) {
+        dynamicResolution = 5;
+      } else {
+        dynamicResolution = 4;
       }
     }
 
-    console.log(`✅ Generated ${tempData.features.length} temperature projection points`);
+    console.log(`🌡️ Proxying temperature projection request: ${year}, scenario ${scenario}, zoom ${zoom || 'N/A'}, resolution ${dynamicResolution}...`);
 
-    res.json({
-      success: true,
-      data: tempData,
-      metadata: {
-        bounds: { north, south, east, west },
-        timestamp: new Date().toISOString()
-      }
+    // Build query parameters for climate service
+    const params = new URLSearchParams({
+      north,
+      south,
+      east,
+      west,
+      year,
+      scenario,
+      resolution: dynamicResolution
     });
+
+    // Add optional parameters if provided
+    if (use_real_data) params.append('use_real_data', use_real_data);
+
+    // Proxy request to Python climate service
+    const climateServiceUrl = `${CLIMATE_SERVICE_URL}/api/climate/temperature-projection?${params.toString()}`;
+
+    console.log(`📡 Fetching from: ${climateServiceUrl}`);
+
+    const response = await axios.get(climateServiceUrl, {
+      timeout: 60000 // 60 second timeout for large areas
+    });
+
+    console.log(`✅ Received ${response.data.data?.features?.length || 0} temperature projection hexes from climate service`);
+
+    // Return the response from climate service
+    res.json(response.data);
 
   } catch (error) {
     console.error('❌ NASA temperature projection error:', error.message);
@@ -1410,6 +1498,7 @@ app.get('/api/nasa/temperature-projection', async (req, res) => {
 
 // Start server
 const startServer = async () => {
+  logEnvWarnings();
   await createUploadsDir();
   await initializeDatabase();
 

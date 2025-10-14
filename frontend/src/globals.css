@@ -126,3 +126,8 @@
 .leaflet-container a {
   cursor: pointer;
 }
+
+/* Carto dark basemap with blue water customization */
+.carto-basemap-blue-water {
+  filter: sepia(0.15) saturate(1.8) hue-rotate(180deg) brightness(0.95);
+}

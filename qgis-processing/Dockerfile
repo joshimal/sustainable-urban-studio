@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages
+# First upgrade numpy to avoid version conflicts
 RUN pip3 install --upgrade pip && \
+    pip3 install --upgrade numpy && \
     pip3 install --ignore-installed \
     flask \
     flask-cors \
@@ -20,7 +22,14 @@ RUN pip3 install --upgrade pip && \
     rasterio \
     shapely \
     requests \
-    schedule
+    schedule \
+    xarray \
+    netCDF4 \
+    h5netcdf \
+    h3 \
+    s3fs \
+    boto3 \
+    dask
 
 # Set up QGIS environment
 ENV PYTHONPATH="${PYTHONPATH}:/usr/share/qgis/python:/usr/lib/python3/dist-packages"
@@ -50,5 +59,5 @@ RUN chmod +x /app/scripts/*.py 2>/dev/null || true
 # Expose port
 EXPOSE 5000
 
-# Start the Urban Heat Island server
-CMD ["python3", "urban_heat_server.py"]
+# Start the Climate Data server (includes NASA NEX-GDDP and other climate endpoints)
+CMD ["python3", "climate_server.py"]

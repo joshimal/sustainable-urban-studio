@@ -26,6 +26,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:your_password_here@urban-studio-db:5432/urban_studio
       - NODE_ENV=development
+      - CLIMATE_SERVICE_URL=http://urban-studio-qgis:5000
     ports:
       - "3001:3001"
     volumes:
@@ -56,7 +57,7 @@ services:
       - urban-studio-network
     restart: unless-stopped
 
-  # QGIS service - ARM64 compatible alternative
+  # Climate & QGIS service - Serves NASA NEX-GDDP climate data and QGIS processing
   urban-studio-qgis:
     build:
       context: ./qgis-processing
@@ -66,6 +67,8 @@ services:
     environment:
       - DISPLAY=:1
       - QT_X11_NO_MITSHM=1
+      - PORT=5000
+      - FLASK_ENV=development
     ports:
       - "8081:5000"
     volumes:

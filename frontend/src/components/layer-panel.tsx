@@ -1,588 +1,340 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { Button } from "./ui/button"
+import React, { useMemo } from "react"
+import { climateLayers, ClimateControl } from "../config/climateLayers"
+import { useClimate } from "../contexts/ClimateContext"
 import { Slider } from "./ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
-import { X, GripVertical, ChevronDown, ChevronUp } from "lucide-react"
+import { Input } from "./ui/input"
+import { Loader2 } from "lucide-react"
+import { LayerStateMap } from "../hooks/useClimateLayerData"
 
-interface LayerPanelProps {
-  selectedLayer: string
-  onClose: () => void
-  onSeaLevelChange: (feet: number) => void
-  onProjectionYearChange: (year: number) => void
-  onClimateScenarioChange: (scenario: string) => void
-  onLayerSettingsChange: (settings: any) => void
-  seaLevelFeet: number
-  projectionYear: number
-  climateScenario: string
-  embedded?: boolean
-  onlyLayerList?: boolean
-  onlyControls?: boolean
-  enabledLayers?: string[]
-}
+const scenarioOptions = [
+  { value: "rcp26", label: "RCP 2.6 (Low)" },
+  { value: "rcp45", label: "RCP 4.5 (Moderate)" },
+  { value: "rcp85", label: "RCP 8.5 (High)" },
+  { value: "ssp126", label: "SSP1-2.6" },
+  { value: "ssp245", label: "SSP2-4.5" },
+  { value: "ssp585", label: "SSP5-8.5" },
+]
 
-export function LayerPanel({
-  selectedLayer,
-  onClose,
-  onSeaLevelChange,
-  onProjectionYearChange,
-  onClimateScenarioChange,
-  onLayerSettingsChange,
-  seaLevelFeet,
-  projectionYear,
-  climateScenario,
-  embedded = false,
-  onlyLayerList = false,
-  onlyControls = false,
-  enabledLayers = []
-}: LayerPanelProps) {
-  const [localSettings, setLocalSettings] = useState({
-    selectedDataset: 'sea_level_rise',
-    enabledLayers: (onlyControls ? enabledLayers : []) as string[],
-    layerOrder: ['sea_level_rise', 'elevation', 'temperature_projection', 'temperature', 'urban_heat_island'],
-    seaLevelOpacity: 60,
-    displayStyle: 'depth',
-    showBorder: true,
-    borderColor: 'cyan',
-    borderWidth: 1,
-    temperatureThreshold: 0,
-    urbanHeatOpacity: 20,
-    urbanHeatIntensity: 50,
-    tempProjectionOpacity: 60,
-    temperatureOpacity: 50,
-    elevationOpacity: 50
-  })
+const resolutionOptions = [
+  { value: 0.5, label: "0.5° (High detail)" },
+  { value: 1, label: "1°" },
+  { value: 2, label: "2° (Faster)" },
+]
 
-  const [collapsedCards, setCollapsedCards] = useState<Record<string, boolean>>({})
-  const [hasInitialized, setHasInitialized] = useState(false)
+const controlOrder: ClimateControl[] = [
+  "seaLevelFeet",
+  "seaLevelOpacity",
+  "scenario",
+  "projectionYear",
+  "analysisDate",
+  "displayStyle",
+  "resolution",
+  "projectionOpacity",
+]
 
-  useEffect(() => {
-    if (onlyLayerList && !hasInitialized) {
-      setHasInitialized(true);
-      return;
-    }
-    
-    if (onlyControls) {
-      return;
-    }
-    
-    console.log('🔄 LayerPanel: Local settings changed:', localSettings.enabledLayers);
-    console.log('🔄 LayerPanel: Calling onLayerSettingsChange');
-    
-    const settingsToSend = {
-      ...localSettings,
-      seaLevelOpacity: localSettings.seaLevelOpacity / 100,
-      urbanHeatOpacity: localSettings.urbanHeatOpacity / 100,
-      temperatureOpacity: localSettings.temperatureOpacity / 100,
-      elevationOpacity: localSettings.elevationOpacity / 100
-    };
-    console.log('🔄 LayerPanel: Settings being sent:', settingsToSend);
-    onLayerSettingsChange(settingsToSend);
-  }, [localSettings, onlyControls, hasInitialized, onlyLayerList]);
+type ControlSetters = Pick<
+  ReturnType<typeof useClimate>,
+  "setSeaLevelFeet" |
+  "setSeaLevelOpacity" |
+  "setScenario" |
+  "setProjectionYear" |
+  "setAnalysisDate" |
+  "setDisplayStyle" |
+  "setResolution" |
+  "setProjectionOpacity"
+>
 
-  const toggleLayer = (layerId: string, checked: boolean) => {
-    console.log('🔄 Toggling layer:', layerId, 'checked:', checked);
-    
-    setLocalSettings(prev => {
-      const newEnabledLayers = checked
-        ? [...prev.enabledLayers, layerId]
-        : prev.enabledLayers.filter(id => id !== layerId);
-      
-      console.log('📋 New enabled layers:', newEnabledLayers);
-      
-      return {
-        ...prev,
-        enabledLayers: newEnabledLayers
-      };
-    });
-  };
-
-  const toggleCardCollapse = (layerId: string) => {
-    setCollapsedCards(prev => ({
-      ...prev,
-      [layerId]: !prev[layerId]
-    }));
-  };
-
-  const sendPartialUpdate = (updates: Partial<typeof localSettings>) => {
-    if (!onlyControls) {
-      return;
-    }
-    console.log('🎛️ Controls sending partial update:', updates);
-    onLayerSettingsChange({
-      enabledLayers: enabledLayers,
-      ...updates
-    });
-  };
-
-  const activeEnabledLayers = onlyControls ? enabledLayers : localSettings.enabledLayers;
-
-  const LayerList = () => {
-    const layerRowClass = (enabled: boolean) =>
-      `flex items-center gap-2 p-2 rounded border transition-colors group ${
-        enabled
-          ? 'bg-blue-500/10 border-blue-500/50 hover:bg-blue-500/20'
-          : 'bg-muted/30 border-border/50 hover:bg-muted/50'
-      }`
-
-    return (
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground mb-3">
-          Check layers to enable • Drag to reorder
-        </p>
-
-        <div
-          className={layerRowClass(localSettings.enabledLayers.includes('sea_level_rise'))}
-          title="Sea Level Rise (NOAA)"
-        >
-          <GripVertical
-            className={`h-4 w-4 cursor-move flex-shrink-0 ${
-              localSettings.enabledLayers.includes('sea_level_rise') ? 'text-blue-400' : 'text-muted-foreground'
-            }`}
-          />
-          <input
-            type="checkbox"
-            id="layer-sea-level"
-            checked={localSettings.enabledLayers.includes('sea_level_rise')}
-            onChange={(e) => toggleLayer('sea_level_rise', e.target.checked)}
-            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
-          />
-          <label
-            htmlFor="layer-sea-level"
-            className="text-sm flex-1 cursor-pointer truncate"
-          >
-            Sea Level Rise (NOAA)
-          </label>
-          <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0"></div>
-        </div>
-
-        <div
-          className={layerRowClass(localSettings.enabledLayers.includes('elevation'))}
-          title="Elevation (USGS 3DEP)"
-        >
-          <GripVertical
-            className={`h-4 w-4 cursor-move flex-shrink-0 ${
-              localSettings.enabledLayers.includes('elevation') ? 'text-blue-400' : 'text-muted-foreground'
-            }`}
-          />
-          <input
-            type="checkbox"
-            id="layer-elevation"
-            checked={localSettings.enabledLayers.includes('elevation')}
-            onChange={(e) => toggleLayer('elevation', e.target.checked)}
-            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
-          />
-          <label
-            htmlFor="layer-elevation"
-            className="text-sm flex-1 cursor-pointer truncate"
-          >
-            Elevation (USGS 3DEP)
-          </label>
-          <div className="w-3 h-3 rounded-full bg-cyan-500 flex-shrink-0"></div>
-        </div>
-
-        <div
-          className={layerRowClass(localSettings.enabledLayers.includes('temperature_projection'))}
-          title="Future Temperature (NASA NEX-GDDP)"
-        >
-          <GripVertical
-            className={`h-4 w-4 cursor-move flex-shrink-0 ${
-              localSettings.enabledLayers.includes('temperature_projection') ? 'text-blue-400' : 'text-muted-foreground'
-            }`}
-          />
-          <input
-            type="checkbox"
-            id="layer-temp-projection"
-            checked={localSettings.enabledLayers.includes('temperature_projection')}
-            onChange={(e) => toggleLayer('temperature_projection', e.target.checked)}
-            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
-          />
-          <label
-            htmlFor="layer-temp-projection"
-            className="text-sm flex-1 cursor-pointer truncate"
-          >
-            Future Temperature (NASA NEX-GDDP)
-          </label>
-          <div className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0"></div>
-        </div>
-
-        <div
-          className={layerRowClass(localSettings.enabledLayers.includes('temperature'))}
-          title="Current Surface Temperature (NASA GISTEMP)"
-        >
-          <GripVertical
-            className={`h-4 w-4 cursor-move flex-shrink-0 ${
-              localSettings.enabledLayers.includes('temperature') ? 'text-blue-400' : 'text-muted-foreground'
-            }`}
-          />
-          <input
-            type="checkbox"
-            id="layer-temperature"
-            checked={localSettings.enabledLayers.includes('temperature')}
-            onChange={(e) => toggleLayer('temperature', e.target.checked)}
-            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
-          />
-          <label
-            htmlFor="layer-temperature"
-            className="text-sm flex-1 cursor-pointer truncate"
-          >
-            Current Surface Temperature (NASA GISTEMP)
-          </label>
-          <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></div>
-        </div>
-
-        <div
-          className={layerRowClass(localSettings.enabledLayers.includes('urban_heat_island'))}
-          title="Urban Heat Island (NASA MODIS LST)"
-        >
-          <GripVertical
-            className={`h-4 w-4 cursor-move flex-shrink-0 ${
-              localSettings.enabledLayers.includes('urban_heat_island') ? 'text-blue-400' : 'text-muted-foreground'
-            }`}
-          />
-          <input
-            type="checkbox"
-            id="layer-urban-heat"
-            checked={localSettings.enabledLayers.includes('urban_heat_island')}
-            onChange={(e) => toggleLayer('urban_heat_island', e.target.checked)}
-            className="w-4 h-4 cursor-pointer flex-shrink-0 accent-blue-500"
-          />
-          <label
-            htmlFor="layer-urban-heat"
-            className="text-sm flex-1 cursor-pointer truncate"
-          >
-            Urban Heat Island (NASA MODIS LST)
-          </label>
-          <div className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0"></div>
-        </div>
-      </div>
-    )
-  }
-
-  const LayerControls = () => (
-    <div className="space-y-4">
-      {/* Sea Level Rise Controls Card */}
-{activeEnabledLayers.includes('sea_level_rise') && (
-  <div className="border border-border rounded-lg overflow-hidden bg-card">
-    <button
-      onClick={() => toggleCardCollapse('sea_level_rise')}
-      className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
-    >
-      <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-        <h4 className="text-sm font-semibold">Sea Level Rise (NOAA)</h4>
-      </div>
-      {collapsedCards['sea_level_rise'] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-    </button>
-    
-    {!collapsedCards['sea_level_rise'] && (
-      <div className="p-4 pt-0 space-y-4">
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs text-muted-foreground">Sea Level Rise</label>
-            <span className="text-sm font-medium text-blue-400">{seaLevelFeet} feet</span>
+const renderControl = (
+  control: ClimateControl,
+  values: ReturnType<typeof useClimate>["controls"],
+  setters: ControlSetters
+) => {
+  const { setSeaLevelFeet, setScenario, setProjectionYear, setAnalysisDate, setDisplayStyle, setResolution } = setters
+  switch (control) {
+    case "seaLevelFeet":
+      return (
+        <div key="seaLevelFeet" className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground">Sea Level Rise</label>
+              <p className="text-[11px] text-muted-foreground">Adjust inundation depth (0-10 ft)</p>
+            </div>
+            <span className="text-sm font-medium text-blue-400">{values.seaLevelFeet} ft</span>
           </div>
           <Slider
-            value={[seaLevelFeet]}
-            onValueChange={(value) => onSeaLevelChange(value[0])}
+            value={[values.seaLevelFeet]}
             min={0}
-            max={6}
+            max={10}
             step={1}
-            className="w-full"
+            onValueChange={value => setSeaLevelFeet(value[0])}
           />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>0ft</span>
-            <span className="text-muted-foreground/50">Baseline (Current)</span>
-            <span>6ft</span>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>0 ft</span>
+            <span>10 ft</span>
           </div>
         </div>
-
-        <div>
-          <label className="text-xs text-muted-foreground block mb-2">Display style</label>
-          <Select
-            value={localSettings.displayStyle}
-            onValueChange={(value) => {
-              setLocalSettings(prev => ({ ...prev, displayStyle: value }));
-              sendPartialUpdate({ displayStyle: value });
-            }}
-          >
+      )
+    case "scenario":
+      return (
+        <div key="scenario" className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-muted-foreground">Climate Scenario</label>
+          </div>
+          <Select value={values.scenario} onValueChange={value => setScenario(value)}>
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <SelectValue placeholder="Choose scenario" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="depth">Depth (Layer 1)</SelectItem>
-              <SelectItem value="confidence">Confidence</SelectItem>
+            <SelectContent className="z-[9999]">
+              {scenarioOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs text-muted-foreground">Layer Opacity</label>
-            <span className="text-xs font-medium">{localSettings.seaLevelOpacity}%</span>
+      )
+    case "projectionYear":
+      return (
+        <div key="projectionYear" className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground">Projection Year</label>
+              <p className="text-[11px] text-muted-foreground">Select forecast horizon (2025-2100)</p>
+            </div>
+            <span className="text-sm font-medium text-orange-400">{values.projectionYear}</span>
           </div>
           <Slider
-            value={[localSettings.seaLevelOpacity]}
-            onValueChange={(value) => {
-              setLocalSettings(prev => ({ ...prev, seaLevelOpacity: value[0] }));
-              sendPartialUpdate({ seaLevelOpacity: value[0] / 100 });
-            }}
-            min={0}
-            max={100}
-            step={1}
+            value={[values.projectionYear]}
+            min={2025}
+            max={2100}
+            step={5}
+            onValueChange={value => setProjectionYear(value[0])}
+          />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>2025</span>
+            <span>2100</span>
+          </div>
+        </div>
+      )
+    case "analysisDate":
+      return (
+        <div key="analysisDate" className="space-y-2">
+          <label className="text-xs font-semibold text-muted-foreground">Analysis Date</label>
+          <Input
+            type="date"
+            value={values.analysisDate}
+            onChange={event => setAnalysisDate(event.target.value)}
             className="w-full"
           />
         </div>
+      )
+    case "displayStyle":
+      return (
+        <div key="displayStyle" className="space-y-2">
+          <label className="text-xs font-semibold text-muted-foreground">Sea Level Display</label>
+          <Select value={values.displayStyle} onValueChange={value => setDisplayStyle(value as "depth" | "confidence")}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose style" />
+            </SelectTrigger>
+            <SelectContent className="z-[9999]">
+              <SelectItem value="depth">Depth Grid</SelectItem>
+              <SelectItem value="confidence">Confidence Extent</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )
+    case "resolution":
+      return (
+        <div key="resolution" className="space-y-2">
+          <label className="text-xs font-semibold text-muted-foreground">Sampling Resolution</label>
+          <Select value={String(values.resolution)} onValueChange={value => setResolution(Number(value))}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Resolution" />
+            </SelectTrigger>
+            <SelectContent className="z-[9999]">
+              {resolutionOptions.map(option => (
+                <SelectItem key={option.value} value={String(option.value)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )
+    case "seaLevelOpacity":
+      return (
+        <div key="seaLevelOpacity" className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-muted-foreground">Layer Opacity</label>
+            <span className="text-xs font-medium">{Math.round(values.seaLevelOpacity * 100)}%</span>
+          </div>
+          <Slider
+            value={[Math.round(values.seaLevelOpacity * 100)]}
+            min={10}
+            max={100}
+            step={5}
+            onValueChange={value => setters.setSeaLevelOpacity(value[0] / 100)}
+          />
+        </div>
+      )
+    case "projectionOpacity":
+      return (
+        <div key="projectionOpacity" className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-muted-foreground">Layer Opacity</label>
+            <span className="text-xs font-medium">{Math.round(values.projectionOpacity * 100)}%</span>
+          </div>
+          <Slider
+            value={[Math.round(values.projectionOpacity * 100)]}
+            min={10}
+            max={100}
+            step={5}
+            onValueChange={value => setters.setProjectionOpacity(value[0] / 100)}
+          />
+        </div>
+      )
+    default:
+      return null
+  }
+}
+
+interface LayerPanelProps {
+  layerStates?: LayerStateMap
+}
+
+export function LayerPanel({ layerStates = {} }: LayerPanelProps) {
+  const { activeLayerIds, toggleLayer, isLayerActive } = useClimate()
+
+  return (
+    <div className="space-y-6 p-4">
+      <div>
+        <h3 className="text-sm font-semibold">Climate Layers</h3>
+        <div className="mt-3 space-y-3">
+          {climateLayers.map(layer => {
+            const active = isLayerActive(layer.id)
+            return (
+              <label
+                key={layer.id}
+                className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
+                  active ? "border-blue-500/60 bg-blue-500/10" : "border-border/60 bg-muted/20 hover:bg-muted/40"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 flex-shrink-0 accent-blue-500"
+                  checked={active}
+                  onChange={() => toggleLayer(layer.id)}
+                />
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-medium">{layer.title}</h4>
+                    <span className="rounded bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-wide text-secondary-foreground">
+                      {layer.category}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{layer.description}</p>
+                  <p className="text-[11px] text-muted-foreground/80">
+                    Source: <span className="font-medium text-foreground">{layer.source.name}</span>
+                  </p>
+                </div>
+              </label>
+            )
+          })}
+        </div>
       </div>
-    )}
-  </div>
-)}
-      {activeEnabledLayers.includes('temperature_projection') && (
-        <div className="border border-border rounded-lg overflow-hidden bg-card">
-          <button
-            onClick={() => toggleCardCollapse('temperature_projection')}
-            className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-              <h4 className="text-sm font-semibold">Future Temperature (NASA NEX-GDDP)</h4>
-            </div>
-            {collapsedCards['temperature_projection'] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </button>
-          
-          {!collapsedCards['temperature_projection'] && (
-            <div className="p-4 pt-0 space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-muted-foreground">Layer Opacity</label>
-                  <span className="text-xs font-medium">{Math.round((localSettings.tempProjectionOpacity || 0.6) * 100)}%</span>
-                </div>
-                <Slider
-                  value={[Math.round((localSettings.tempProjectionOpacity || 0.6) * 100)]}
-                  onValueChange={(value) => {
-                    setLocalSettings(prev => ({ ...prev, tempProjectionOpacity: value[0] / 100 }));
-                    sendPartialUpdate({ tempProjectionOpacity: value[0] / 100 });
-                  }}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-muted-foreground">Projection Year</label>
-                  <span className="text-xs font-medium">{projectionYear}</span>
-                </div>
-                <Slider
-                  value={[projectionYear]}
-                  onValueChange={(value) => onProjectionYearChange(value[0])}
-                  min={2025}
-                  max={2100}
-                  step={5}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>2025</span>
-                  <span>2100</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-muted-foreground block mb-2">Climate Scenario</label>
-                <Select
-                  value={climateScenario}
-                  onValueChange={onClimateScenarioChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rcp26">RCP 2.6 (Low Emissions)</SelectItem>
-                    <SelectItem value="rcp45">RCP 4.5 (Moderate Emissions)</SelectItem>
-                    <SelectItem value="rcp85">RCP 8.5 (High Emissions)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeEnabledLayers.includes('urban_heat_island') && (
-        <div className="border border-border rounded-lg overflow-hidden bg-card">
-          <button
-            onClick={() => toggleCardCollapse('urban_heat_island')}
-            className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <h4 className="text-sm font-semibold">Urban Heat Island (NASA MODIS LST)</h4>
-            </div>
-            {collapsedCards['urban_heat_island'] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </button>
-          
-          {!collapsedCards['urban_heat_island'] && (
-            <div className="p-4 pt-0 space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-muted-foreground">Layer Opacity</label>
-                  <span className="text-xs font-medium">{localSettings.urbanHeatOpacity}%</span>
-                </div>
-                <Slider
-                  value={[localSettings.urbanHeatOpacity]}
-                  onValueChange={(value) => {
-                    setLocalSettings(prev => ({ ...prev, urbanHeatOpacity: value[0] }));
-                    sendPartialUpdate({ urbanHeatOpacity: value[0] / 100 });
-                  }}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeEnabledLayers.includes('temperature') && (
-        <div className="border border-border rounded-lg overflow-hidden bg-card">
-          <button
-            onClick={() => toggleCardCollapse('temperature')}
-            className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <h4 className="text-sm font-semibold">Land Surface Temperature</h4>
-            </div>
-            {collapsedCards['temperature'] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </button>
-          
-          {!collapsedCards['temperature'] && (
-            <div className="p-4 pt-0 space-y-4">
-              <p className="text-xs text-amber-400">
-                Landsat 8/9 thermal imagery processed to show urban heat patterns
-              </p>
-              
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-muted-foreground">Layer Opacity</label>
-                  <span className="text-xs font-medium">{localSettings.temperatureOpacity}%</span>
-                </div>
-                <Slider
-                  value={[localSettings.temperatureOpacity]}
-                  onValueChange={(value) => {
-                    setLocalSettings(prev => ({ ...prev, temperatureOpacity: value[0] }));
-                    sendPartialUpdate({ temperatureOpacity: value[0] / 100 });
-                  }}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-muted-foreground block mb-2">Temperature Scale</label>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-blue-500"></div>
-                    <span className="text-xs">20-25°C (Cool)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-cyan-400"></div>
-                    <span className="text-xs">25-35°C (Moderate)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-amber-400"></div>
-                    <span className="text-xs">35-40°C (Warm)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-red-500"></div>
-                    <span className="text-xs">40-45°C (Hot)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-red-800"></div>
-                    <span className="text-xs">45-50°C (Extreme)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeEnabledLayers.includes('elevation') && (
-        <div className="border border-border rounded-lg overflow-hidden bg-card">
-          <button
-            onClick={() => toggleCardCollapse('elevation')}
-            className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
-              <h4 className="text-sm font-semibold">Elevation (USGS 3DEP)</h4>
-            </div>
-            {collapsedCards['elevation'] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-          </button>
-          
-          {!collapsedCards['elevation'] && (
-            <div className="p-4 pt-0 space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-muted-foreground">Layer Opacity</label>
-                  <span className="text-xs font-medium">{localSettings.elevationOpacity}%</span>
-                </div>
-                <Slider
-                  value={[localSettings.elevationOpacity]}
-                  onValueChange={(value) => {
-                    setLocalSettings(prev => ({ ...prev, elevationOpacity: value[0] }));
-                    sendPartialUpdate({ elevationOpacity: value[0] / 100 });
-                  }}
-                  min={0}
-                  max={100}
-                  step={1}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeEnabledLayers.length === 0 && (
-        <div className="text-sm text-muted-foreground text-center py-8">
-          Enable a layer to see controls
-        </div>
-      )}
     </div>
-  );
+  )
+}
 
-  if (onlyLayerList) {
-    return <LayerList />;
+interface LayerControlsPanelProps {
+  layerStates?: LayerStateMap
+}
+
+export function LayerControlsPanel({ layerStates = {} }: LayerControlsPanelProps) {
+  const climate = useClimate()
+  const { activeLayerIds } = climate
+
+  const activeLayersWithControls = useMemo(
+    () =>
+      climateLayers.filter(layer =>
+        activeLayerIds.includes(layer.id) && layer.controls.length > 0
+      ),
+    [activeLayerIds]
+  )
+
+  if (activeLayersWithControls.length === 0) {
+    return null
   }
 
-  if (onlyControls) {
-    return <LayerControls />;
+  const setters: ControlSetters = {
+    setSeaLevelFeet: climate.setSeaLevelFeet,
+    setScenario: climate.setScenario,
+    setProjectionYear: climate.setProjectionYear,
+    setAnalysisDate: climate.setAnalysisDate,
+    setDisplayStyle: climate.setDisplayStyle,
+    setResolution: climate.setResolution,
+    setProjectionOpacity: climate.setProjectionOpacity,
   }
 
   return (
-    <div className={embedded ? "" : "h-full bg-card flex flex-col"}>
-      {!embedded && (
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Climate Data Layers</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      <div className={embedded ? "" : "flex-1 overflow-y-auto p-4"}>
-        <LayerList />
-        <div className="border-t border-border my-4"></div>
-        <LayerControls />
+    <div className="space-y-3">
+      <div className="space-y-3">
+        {activeLayersWithControls.map(layer => (
+          <div key={layer.id} className="space-y-3 rounded-lg border border-border/60 bg-card/95 backdrop-blur-lg p-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold">{layer.title}</h4>
+              <span className="rounded bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-wide text-secondary-foreground">
+                {layer.category}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {layer.controls.map(control =>
+                renderControl(control, climate.controls, setters)
+              )}
+              {layer.id === "temperature_projection" && (
+                <>
+                  {layerStates.temperature_projection?.status === 'loading' && (
+                    <div className="space-y-2 rounded-md border border-blue-500/30 bg-blue-500/10 p-3">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                        <p className="text-xs text-foreground">Loading NASA temperature data...</p>
+                      </div>
+                    </div>
+                  )}
+                  {layerStates.temperature_projection?.status === 'success' && (
+                    <div className="space-y-2 rounded-md border border-green-500/30 bg-green-500/10 p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center">
+                          <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <p className="text-xs text-foreground">NASA temperature data loaded</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-semibold text-muted-foreground">Temperature Anomaly (°C)</p>
+                    <div className="h-3 w-full rounded-full bg-gradient-to-r from-[#6b2491] via-[#9d559c] via-[#c48b98] via-[#ddb27c] via-[#ebc054] via-[#e08237] to-[#ba3b19]" />
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>0°</span>
+                      <span>1°</span>
+                      <span>2°</span>
+                      <span>3°</span>
+                      <span>4°</span>
+                      <span>6°</span>
+                      <span>8°+</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

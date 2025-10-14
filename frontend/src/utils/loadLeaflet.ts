@@ -40,6 +40,16 @@ export const loadLeaflet = async (): Promise<any> => {
     (window as any).L = L;
   }
 
+  // Load leaflet.heat plugin after Leaflet is ready
+  if (!L.heatLayer) {
+    try {
+      await import('leaflet.heat');
+      // The plugin should now be attached to L
+    } catch (err) {
+      console.warn('Failed to load leaflet.heat:', err);
+    }
+  }
+
   return L;
 };
 
