@@ -3,11 +3,18 @@ import { fileURLToPath } from 'url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
+import cesium from 'vite-plugin-cesium'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
+  plugins: [
+    react(),
+    tsconfigPaths(),
+    cesium({
+      rebuildCesium: true
+    })
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -27,6 +34,6 @@ export default defineConfig({
     postcss: './postcss.config.cjs'
   },
   optimizeDeps: {
-    exclude: ['leaflet']
+    exclude: ['leaflet', 'cesium']
   }
 })

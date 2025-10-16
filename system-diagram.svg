@@ -1,0 +1,135 @@
+<svg width="1400" height="1600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .header-box { fill: #2c3e50; stroke: #34495e; stroke-width: 3; }
+      .header-text { font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; fill: #ecf0f1; }
+      .container-box { fill: #ecf0f1; stroke: #34495e; stroke-width: 3; }
+      .service-box { fill: #3498db; stroke: #2980b9; stroke-width: 2; }
+      .service-title { font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; fill: #fff; }
+      .service-text { font-family: 'Courier New', monospace; font-size: 13px; fill: #fff; }
+      .db-box { fill: #9b59b6; stroke: #8e44ad; stroke-width: 2; }
+      .climate-box { fill: #e67e22; stroke: #d35400; stroke-width: 2; }
+      .external-box { fill: #95a5a6; stroke: #7f8c8d; stroke-width: 2; }
+      .user-box { fill: #f39c12; stroke: #e67e22; stroke-width: 2; }
+      .network-border { fill: none; stroke: #27ae60; stroke-width: 4; stroke-dasharray: 15,10; }
+      .network-text { font-family: 'Courier New', monospace; font-size: 14px; fill: #27ae60; font-weight: bold; }
+      .arrow { stroke: #34495e; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+      .arrow-label { font-family: 'Courier New', monospace; font-size: 12px; fill: #34495e; font-weight: bold; }
+      .status-text { font-family: 'Courier New', monospace; font-size: 13px; fill: #27ae60; font-weight: bold; }
+      .mono-text { font-family: 'Courier New', monospace; font-size: 13px; fill: #2c3e50; }
+      .footer-box { fill: #34495e; stroke: #2c3e50; stroke-width: 2; }
+      .footer-text { font-family: 'Courier New', monospace; font-size: 13px; fill: #ecf0f1; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#34495e" />
+    </marker>
+  </defs>
+
+  <!-- Main Header -->
+  <rect x="50" y="20" width="1300" height="60" class="header-box" rx="5"/>
+  <text x="700" y="60" text-anchor="middle" class="header-text">
+    SUSTAINABLE URBAN STUDIO - SYSTEM ARCHITECTURE
+  </text>
+
+  <!-- User/Browser -->
+  <rect x="600" y="120" width="200" height="60" class="user-box" rx="8"/>
+  <text x="700" y="145" text-anchor="middle" class="service-title">USER</text>
+  <text x="700" y="165" text-anchor="middle" class="service-text">Browser</text>
+
+  <!-- Arrow: User to Frontend -->
+  <path d="M 700 180 L 700 240" class="arrow"/>
+  <text x="720" y="215" class="arrow-label">HTTP</text>
+
+  <!-- Docker Network Container -->
+  <rect x="80" y="250" width="1240" height="900" class="network-border" rx="10"/>
+  <text x="700" y="280" text-anchor="middle" class="network-text">
+    DOCKER NETWORK: urban-studio-network
+  </text>
+
+  <!-- Frontend Service -->
+  <rect x="120" y="320" width="1160" height="160" class="service-box" rx="8"/>
+  <text x="700" y="350" text-anchor="middle" class="service-title">FRONTEND (React + Vite)</text>
+  <text x="140" y="375" class="service-text">Container: urban-studio-frontend</text>
+  <text x="140" y="395" class="service-text">Status: ✓ Running</text>
+  <text x="140" y="415" class="service-text">Port: 0.0.0.0:8080 → 8080</text>
+  <line x1="140" y1="425" x2="1260" y2="425" stroke="#2980b9" stroke-width="1"/>
+  <text x="140" y="445" class="service-text">• React 18 + TypeScript</text>
+  <text x="500" y="445" class="service-text">• Mapbox GL 3D Maps</text>
+  <text x="140" y="465" class="service-text">• Radix UI + Tailwind CSS</text>
+  <text x="500" y="465" class="service-text">• Axios for API calls</text>
+
+  <!-- Arrow: Frontend to Backend -->
+  <path d="M 700 480 L 700 540" class="arrow"/>
+  <text x="720" y="515" class="arrow-label">REST API</text>
+
+  <!-- Backend Service -->
+  <rect x="120" y="550" width="1160" height="160" class="service-box" rx="8"/>
+  <text x="700" y="580" text-anchor="middle" class="service-title">BACKEND (Node.js + Express)</text>
+  <text x="140" y="605" class="service-text">Container: urban-studio-backend</text>
+  <text x="140" y="625" class="service-text">Status: ✓ Running</text>
+  <text x="140" y="645" class="service-text">Port: 0.0.0.0:3001 → 3001</text>
+  <line x1="140" y1="655" x2="1260" y2="655" stroke="#2980b9" stroke-width="1"/>
+  <text x="140" y="675" class="service-text">• Express REST API</text>
+  <text x="500" y="675" class="service-text">• Turf.js geospatial processing</text>
+  <text x="140" y="695" class="service-text">• Shapefile uploads &amp; parsing</text>
+  <text x="500" y="695" class="service-text">• Rate limiting + CORS</text>
+
+  <!-- Arrow: Backend to Database -->
+  <path d="M 400 710 L 400 780" class="arrow"/>
+  <text x="320" y="750" class="arrow-label">SQL/PostGIS</text>
+
+  <!-- Arrow: Backend to Climate Service -->
+  <path d="M 1000 710 L 1000 780" class="arrow"/>
+  <text x="880" y="750" class="arrow-label">Proxy /api/nasa/*</text>
+
+  <!-- Database Service -->
+  <rect x="120" y="790" width="520" height="160" class="db-box" rx="8"/>
+  <text x="380" y="820" text-anchor="middle" class="service-title">DATABASE (PostgreSQL)</text>
+  <text x="380" y="842" text-anchor="middle" class="service-text">+ PostGIS</text>
+  <text x="140" y="867" class="service-text">Container: urban-studio-db</text>
+  <text x="140" y="887" class="service-text">Status: ✓ Running</text>
+  <text x="140" y="907" class="service-text">Port: 0.0.0.0:5432 → 5432</text>
+  <line x1="140" y1="915" x2="620" y2="915" stroke="#8e44ad" stroke-width="1"/>
+  <text x="140" y="933" class="service-text">• urban_studio DB</text>
+  <text x="340" y="933" class="service-text">• Persistent volumes</text>
+
+  <!-- Climate Service -->
+  <rect x="680" y="790" width="600" height="160" class="climate-box" rx="8"/>
+  <text x="980" y="820" text-anchor="middle" class="service-title">CLIMATE SERVICE (Python + Flask + QGIS)</text>
+  <text x="700" y="847" class="service-text">Container: urban-studio-qgis</text>
+  <text x="700" y="867" class="service-text">Status: ✓ Running</text>
+  <text x="700" y="887" class="service-text">Port: 0.0.0.0:8081 → 5000</text>
+  <line x1="700" y1="895" x2="1260" y2="895" stroke="#d35400" stroke-width="1"/>
+  <text x="700" y="913" class="service-text">• Flask REST API</text>
+  <text x="700" y="933" class="service-text">• xarray + NetCDF processing</text>
+  <text x="1040" y="913" class="service-text">• H3 hexagonal grids</text>
+  <text x="1040" y="933" class="service-text">• NASA NEX-GDDP-CMIP6</text>
+
+  <!-- Arrow: Climate to S3 -->
+  <path d="M 980 950 L 980 1020" class="arrow"/>
+  <text x="1000" y="990" class="arrow-label">s3fs</text>
+
+  <!-- External AWS S3 -->
+  <rect x="680" y="1030" width="600" height="100" class="external-box" rx="8"/>
+  <text x="980" y="1060" text-anchor="middle" class="service-title">AWS S3 (Public, No Auth)</text>
+  <text x="980" y="1082" text-anchor="middle" class="service-text">s3://nasa-nex-gddp-cmip6/</text>
+  <line x1="700" y1="1090" x2="1260" y2="1090" stroke="#7f8c8d" stroke-width="1"/>
+  <text x="720" y="1110" class="service-text">• NetCDF climate data</text>
+  <text x="1020" y="1110" class="service-text">• 2020-2100 scenarios</text>
+
+  <!-- Key Endpoints Box -->
+  <rect x="120" y="1200" width="1160" height="140" class="footer-box" rx="8"/>
+  <text x="700" y="1230" text-anchor="middle" class="header-text">KEY ENDPOINTS</text>
+  <text x="140" y="1260" class="footer-text">• Frontend:        http://localhost:8080</text>
+  <text x="140" y="1285" class="footer-text">• Backend API:     http://localhost:3001</text>
+  <text x="140" y="1310" class="footer-text">• Climate API:     http://localhost:8081</text>
+  <text x="700" y="1260" class="footer-text">• Database:        postgresql://localhost:5432/urban_studio</text>
+
+  <!-- Container Status Box -->
+  <rect x="120" y="1370" width="1160" height="150" class="footer-box" rx="8"/>
+  <text x="700" y="1400" text-anchor="middle" class="header-text">CONTAINER STATUS</text>
+  <text x="140" y="1430" class="footer-text">✓ urban-studio-frontend   Up 3 hours</text>
+  <text x="140" y="1455" class="footer-text">✓ urban-studio-backend    Up 3 hours</text>
+  <text x="140" y="1480" class="footer-text">✓ urban-studio-db         Up 3 hours</text>
+  <text x="140" y="1505" class="footer-text">✓ urban-studio-qgis       Up 3 hours</text>
+</svg>

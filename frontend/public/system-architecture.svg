@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155" />
+    </marker>
+    <style>
+      .title{font:700 20px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:#0f172a}
+      .label{font:600 14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:#0f172a}
+      .small{font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:#334155}
+      .box{rx:10;ry:10;stroke-width:2}
+      .line{stroke:#334155;stroke-width:2;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="24" y="40" class="title">Sustainable Urban Studio – Architecture Overview</text>
+  <text x="24" y="62" class="small">Frontend ↔ Express API ↔ Python Climate/QGIS ↔ External Data</text>
+
+  <!-- Frontend -->
+  <rect x="24" y="96" width="360" height="140" class="box" fill="#ffffff" stroke="#60a5fa"/>
+  <text x="40" y="122" class="label">Frontend (React + TypeScript + Leaflet)</text>
+  <text x="40" y="146" class="small">Vite Dev Server (Port 8082)</text>
+  <text x="40" y="166" class="small">Components: src/components/leaflet-map.tsx</text>
+  <text x="40" y="186" class="small">State: src/contexts/ClimateContext.tsx</text>
+
+  <!-- Backend Express -->
+  <rect x="420" y="96" width="380" height="180" class="box" fill="#ffffff" stroke="#34d399"/>
+  <text x="440" y="122" class="label">Backend API (Node.js Express)</text>
+  <text x="440" y="146" class="small">Port 3001 • backend/server.js</text>
+  <text x="440" y="168" class="small">- /api/tiles/noaa-slr/:feet/:z/:x/:y.png</text>
+  <text x="440" y="186" class="small">- /api/nasa/temperature-projection → Python service</text>
+  <text x="440" y="204" class="small">- /api/modis/lst → UrbanHeatIslandService (docker exec)</text>
+  <text x="440" y="222" class="small">- /api/usgs/elevation (simulated)</text>
+  <text x="440" y="240" class="small">- /api/gis/* (NaturalEarth, Geofabrik/OSM, Census, Municipal)</text>
+
+  <!-- Storage -->
+  <rect x="24" y="264" width="360" height="140" class="box" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="40" y="290" class="label">Local Storage</text>
+  <text x="40" y="314" class="small">backend/uploads (Multer)</text>
+  <text x="40" y="334" class="small">backend/downloads (cached data)</text>
+
+  <!-- Python Flask Climate/QGIS -->
+  <rect x="420" y="312" width="380" height="160" class="box" fill="#ffffff" stroke="#fb923c"/>
+  <text x="440" y="338" class="label">Python Flask Climate/QGIS</text>
+  <text x="440" y="362" class="small">Port 5000 (container: urban-studio-qgis)</text>
+  <text x="440" y="382" class="small">qgis-processing/climate_server.py</text>
+  <text x="440" y="402" class="small">- /api/climate/temperature-projection</text>
+  <text x="440" y="420" class="small">- /api/climate/urban-heat-island</text>
+
+  <!-- External Data Sources -->
+  <rect x="832" y="96" width="344" height="376" class="box" fill="#ffffff" stroke="#f59e0b"/>
+  <text x="852" y="122" class="label">External Data Sources</text>
+  <text x="852" y="146" class="small">NOAA CDO • NOAA SLR Tiles</text>
+  <text x="852" y="166" class="small">NASA NEX-GDDP-CMIP6 (S3)</text>
+  <text x="852" y="186" class="small">Natural Earth • Geofabrik/OSM</text>
+  <text x="852" y="206" class="small">Census TIGER • Microsoft Buildings</text>
+
+  <!-- Arrows and labels -->
+  <!-- Frontend → Backend -->
+  <path class="line" d="M 384 166 C 410 166, 410 166, 420 166" />
+  <text x="396" y="156" class="small">HTTP</text>
+
+  <!-- Backend → Python -->
+  <path class="line" d="M 610 276 C 610 296, 610 296, 610 312" />
+  <text x="624" y="296" class="small">/api/nasa/temperature-projection</text>
+
+  <!-- Backend → External -->
+  <path class="line" d="M 800 186 C 820 186, 820 186, 832 186" />
+  <text x="806" y="176" class="small">NOAA/NASA proxies</text>
+
+  <!-- Python → External -->
+  <path class="line" d="M 800 380 C 820 380, 820 380, 832 380" />
+  <text x="806" y="370" class="small">Models/Data</text>
+
+  <!-- Backend → Storage -->
+  <path class="line" d="M 420 240 C 390 240, 360 240, 360 264" />
+  <text x="320" y="246" class="small">Uploads/Cache</text>
+
+  <!-- Legend -->
+  <rect x="24" y="436" width="1152" height="280" class="box" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="40" y="462" class="label">Legend and Notes</text>
+  <text x="40" y="486" class="small">- Frontend builds requests using config in src/config/climateLayers.ts</text>
+  <text x="40" y="506" class="small">- Express provides GIS endpoints and proxies climate requests to Python Flask</text>
+  <text x="40" y="526" class="small">- Python service generates hexagonal GeoJSON (temperature projections, heat islands)</text>
+  <text x="40" y="546" class="small">- NOAA SLR tiles are proxied as PNG tiles via /api/tiles/noaa-slr/:feet/:z/:x/:y.png</text>
+  <text x="40" y="566" class="small">- Local storage holds uploads and cached downloads</text>
+  <text x="40" y="606" class="small">Open this file directly if the dev server caches: system-architecture.svg</text>
+
+</svg>
+
+
+

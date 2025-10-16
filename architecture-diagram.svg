@@ -1,0 +1,134 @@
+<svg width="1200" height="900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .container { fill: #ffffff; stroke: #333; stroke-width: 2; }
+      .service { fill: #e3f2fd; stroke: #1976d2; stroke-width: 2; }
+      .database { fill: #f3e5f5; stroke: #7b1fa2; stroke-width: 2; }
+      .external { fill: #fff3e0; stroke: #ef6c00; stroke-width: 2; }
+      .text-title { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; fill: #333; }
+      .text-body { font-family: Arial, sans-serif; font-size: 12px; fill: #555; }
+      .text-port { font-family: Arial, sans-serif; font-size: 11px; fill: #777; font-style: italic; }
+      .arrow { stroke: #666; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .arrow-label { font-family: Arial, sans-serif; font-size: 11px; fill: #666; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#666" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" style="font-family: Arial, sans-serif; font-size: 24px; font-weight: bold; fill: #333;">
+    Sustainable Urban Studio Architecture
+  </text>
+
+  <!-- Frontend Container -->
+  <rect x="100" y="100" width="300" height="200" class="service" rx="10"/>
+  <text x="250" y="130" text-anchor="middle" class="text-title">Frontend</text>
+  <text x="250" y="155" text-anchor="middle" class="text-port">http://localhost:8080</text>
+  <text x="120" y="185" class="text-body">• React 18 + TypeScript</text>
+  <text x="120" y="205" class="text-body">• Vite build tool</text>
+  <text x="120" y="225" class="text-body">• Mapbox GL (3D maps)</text>
+  <text x="120" y="245" class="text-body">• Radix UI + Tailwind CSS</text>
+  <text x="120" y="265" class="text-body">• React Hook Form + Zod</text>
+
+  <!-- Backend Container -->
+  <rect x="550" y="100" width="300" height="200" class="service" rx="10"/>
+  <text x="700" y="130" text-anchor="middle" class="text-title">Backend API</text>
+  <text x="700" y="155" text-anchor="middle" class="text-port">http://localhost:3001</text>
+  <text x="570" y="185" class="text-body">• Node.js + Express</text>
+  <text x="570" y="205" class="text-body">• PostgreSQL + PostGIS</text>
+  <text x="570" y="225" class="text-body">• Turf.js (geospatial ops)</text>
+  <text x="570" y="245" class="text-body">• Shapefile processing</text>
+  <text x="570" y="265" class="text-body">• Rate limiting + CORS</text>
+
+  <!-- Database Container -->
+  <rect x="550" y="400" width="300" height="150" class="database" rx="10"/>
+  <text x="700" y="430" text-anchor="middle" class="text-title">PostgreSQL + PostGIS</text>
+  <text x="700" y="455" text-anchor="middle" class="text-port">localhost:5432</text>
+  <text x="570" y="485" class="text-body">• Spatial database</text>
+  <text x="570" y="505" class="text-body">• urban_studio DB</text>
+  <text x="570" y="525" class="text-body">• Persistent volume storage</text>
+
+  <!-- QGIS Climate Service Container -->
+  <rect x="100" y="400" width="300" height="200" class="service" rx="10"/>
+  <text x="250" y="430" text-anchor="middle" class="text-title">Climate Service</text>
+  <text x="250" y="455" text-anchor="middle" class="text-port">http://localhost:8081 (Flask:5000)</text>
+  <text x="120" y="485" class="text-body">• Python + Flask + QGIS</text>
+  <text x="120" y="505" class="text-body">• xarray + NetCDF processing</text>
+  <text x="120" y="525" class="text-body">• H3 hexagonal grids</text>
+  <text x="120" y="545" class="text-body">• NASA NEX-GDDP-CMIP6 data</text>
+  <text x="120" y="565" class="text-body">• Climate projections API</text>
+
+  <!-- External NASA S3 -->
+  <rect x="100" y="680" width="300" height="100" class="external" rx="10"/>
+  <text x="250" y="710" text-anchor="middle" class="text-title">NASA Open Data</text>
+  <text x="250" y="735" text-anchor="middle" class="text-port">s3://nasa-nex-gddp-cmip6/</text>
+  <text x="120" y="760" class="text-body">• Public S3 bucket (no auth)</text>
+
+  <!-- Docker Network -->
+  <rect x="50" y="350" width="850" height="250" style="fill: none; stroke: #4caf50; stroke-width: 3; stroke-dasharray: 10,5;" rx="15"/>
+  <text x="470" y="375" text-anchor="middle" style="font-family: Arial, sans-serif; font-size: 14px; fill: #4caf50; font-weight: bold;">Docker Network: urban-studio-network</text>
+
+  <!-- Arrows and Labels -->
+
+  <!-- Frontend to Backend -->
+  <path d="M 400 200 L 550 200" class="arrow"/>
+  <text x="475" y="190" text-anchor="middle" class="arrow-label">REST API</text>
+  <text x="475" y="205" text-anchor="middle" class="arrow-label">calls</text>
+
+  <!-- Backend to Database -->
+  <path d="M 700 300 L 700 400" class="arrow"/>
+  <text x="730" y="350" class="arrow-label">SQL queries</text>
+  <text x="730" y="365" class="arrow-label">(PostGIS)</text>
+
+  <!-- Backend to Climate Service -->
+  <path d="M 550 250 L 400 450" class="arrow"/>
+  <text x="450" y="330" class="arrow-label">Proxy requests</text>
+  <text x="450" y="345" class="arrow-label">/api/nasa/*</text>
+
+  <!-- Climate Service to NASA S3 -->
+  <path d="M 250 600 L 250 680" class="arrow"/>
+  <text x="280" y="640" class="arrow-label">Stream NetCDF</text>
+  <text x="280" y="655" class="arrow-label">via s3fs</text>
+
+  <!-- User/Browser -->
+  <ellipse cx="250" cy="50" rx="60" ry="25" style="fill: #ffeb3b; stroke: #f57f17; stroke-width: 2;"/>
+  <text x="250" y="57" text-anchor="middle" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #333;">User</text>
+
+  <!-- User to Frontend -->
+  <path d="M 250 75 L 250 100" class="arrow"/>
+
+  <!-- Key Features Box -->
+  <rect x="950" y="100" width="200" height="280" style="fill: #f5f5f5; stroke: #999; stroke-width: 2;" rx="10"/>
+  <text x="1050" y="130" text-anchor="middle" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #333;">Key Features</text>
+
+  <text x="965" y="160" class="text-body">🗺️ Interactive 3D maps</text>
+  <text x="965" y="180" class="text-body">📊 Climate projections</text>
+  <text x="965" y="200" class="text-body">🌡️ Temperature anomalies</text>
+  <text x="965" y="220" class="text-body">📍 Spatial analysis</text>
+  <text x="965" y="240" class="text-body">📈 Data visualization</text>
+  <text x="965" y="260" class="text-body">🔄 Real-time processing</text>
+  <text x="965" y="280" class="text-body">🏙️ Urban planning tools</text>
+  <text x="965" y="300" class="text-body">💾 PostGIS storage</text>
+  <text x="965" y="320" class="text-body">🔐 Rate limiting</text>
+  <text x="965" y="340" class="text-body">🐳 Docker deployment</text>
+  <text x="965" y="360" class="text-body">🌐 CORS enabled</text>
+
+  <!-- Tech Stack Box -->
+  <rect x="950" y="400" width="200" height="180" style="fill: #e8f5e9; stroke: #4caf50; stroke-width: 2;" rx="10"/>
+  <text x="1050" y="430" text-anchor="middle" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #333;">Tech Stack</text>
+
+  <text x="965" y="460" class="text-body">Frontend: React + Vite</text>
+  <text x="965" y="480" class="text-body">Backend: Node.js</text>
+  <text x="965" y="500" class="text-body">Database: PostgreSQL</text>
+  <text x="965" y="520" class="text-body">Climate: Python + QGIS</text>
+  <text x="965" y="540" class="text-body">Maps: Mapbox GL</text>
+  <text x="965" y="560" class="text-body">Container: Docker</text>
+
+  <!-- Data Flow Legend -->
+  <text x="100" y="850" style="font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; fill: #333;">Data Flow:</text>
+  <text x="100" y="875" class="text-body">1. User interacts with React frontend (port 8080)</text>
+  <text x="100" y="890" class="text-body">2. Frontend calls Node.js backend REST API (port 3001)</text>
+  <text x="500" y="875" class="text-body">3. Backend proxies climate requests to Python service (port 8081)</text>
+  <text x="500" y="890" class="text-body">4. Python service fetches NASA data from S3 and processes with xarray</text>
+</svg>
